@@ -7,12 +7,14 @@ import {
   reload,
   signOut,
   sendPasswordResetEmail,
+  GoogleAuthProvider,
+  signInWithCredential,
+  getAdditionalUserInfo,
 } from "firebase/auth";
-import { ref, set, update } from "firebase/database";
+import { ref, set, update, get } from "firebase/database";
 import { auth, db } from "./firebase";
 
 // RTDB keys cannot include: . # $ [ ] /
-// We'll convert to a safe key.
 export function emailToKey(emailLower) {
   return emailLower
     .trim()
@@ -36,7 +38,6 @@ function requireAuth() {
 
 export async function requestPasswordReset(email) {
   const a = requireAuth();
-  // Firebase sends a reset LINK to the email
   await sendPasswordResetEmail(a, email.trim().toLowerCase());
 }
 
@@ -54,7 +55,6 @@ export async function signUpWithEmail({ fullName, email, password }) {
 
   await sendEmailVerification(cred.user);
 
-  // Write user profile
   await set(ref(db, `users/${cred.user.uid}`), {
     uid: cred.user.uid,
     fullName: fullName || "",
@@ -62,9 +62,10 @@ export async function signUpWithEmail({ fullName, email, password }) {
     emailLower,
     emailVerified: false,
     createdAt: Date.now(),
+    provider: "password",
   });
 
-  // Write email index (for "is email taken?" lookup)
+  // email index for quick "is email taken?"
   await set(ref(db, `emailIndex/${safeKey}`), cred.user.uid);
 
   return cred.user;
@@ -73,8 +74,11 @@ export async function signUpWithEmail({ fullName, email, password }) {
 export async function loginWithEmail({ email, password }) {
   const a = requireAuth();
 
-  const cred = await signInWithEmailAndPassword(a, email.trim().toLowerCase(), password);
-
+  const cred = await signInWithEmailAndPassword(
+    a,
+    email.trim().toLowerCase(),
+    password
+  );
   await reload(cred.user);
 
   if (!cred.user.emailVerified) {
@@ -84,7 +88,82 @@ export async function loginWithEmail({ email, password }) {
     throw err;
   }
 
+  // (optional) record last login
+  await update(ref(db, `users/${cred.user.uid}`), {
+    lastLoginAt: Date.now(),
+  });
+
   return cred.user;
+}
+
+// ✅ Google SSO -> Firebase login
+export async function loginWithGoogleTokens({ idToken, accessToken }) {
+  const a = requireAuth();
+
+  if (!idToken) {
+    const err = new Error("MISSING_ID_TOKEN");
+    err.code = "MISSING_ID_TOKEN";
+    throw err;
+  }
+
+  const credential = GoogleAuthProvider.credential(idToken, accessToken || null);
+
+  try {
+    const cred = await signInWithCredential(a, credential);
+    const user = cred.user;
+
+    const info = getAdditionalUserInfo(cred);
+    const isNew = !!info?.isNewUser;
+
+    const emailLower = (user.email || "").trim().toLowerCase();
+    const safeKey = emailLower ? emailToKey(emailLower) : null;
+
+    const userRef = ref(db, `users/${user.uid}`);
+    const snap = await get(userRef);
+
+    const fullName = user.displayName || "";
+    const photoURL = user.photoURL || "";
+
+    if (!snap.exists() || isNew) {
+      await set(userRef, {
+        uid: user.uid,
+        fullName,
+        email: emailLower,
+        emailLower,
+        emailVerified: true, // Google emails are verified
+        createdAt: Date.now(),
+        lastLoginAt: Date.now(),
+        provider: "google",
+        photoURL,
+      });
+    } else {
+      await update(userRef, {
+        fullName,
+        email: emailLower,
+        emailLower,
+        emailVerified: true,
+        provider: "google",
+        photoURL,
+        lastLoginAt: Date.now(),
+      });
+    }
+
+    if (safeKey) {
+      await set(ref(db, `emailIndex/${safeKey}`), user.uid);
+    }
+
+    return user;
+  } catch (e) {
+    // common: user exists with password for same email
+    if (e?.code === "auth/account-exists-with-different-credential") {
+      const err = new Error(
+        "This email is already registered using Email/Password. Please log in with password first."
+      );
+      err.code = e.code;
+      throw err;
+    }
+    throw e;
+  }
 }
 
 export async function resendVerificationEmail() {
