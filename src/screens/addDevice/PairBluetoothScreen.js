@@ -1,17 +1,19 @@
 import React, { useMemo, useState } from "react";
-import { View, Text, StyleSheet, Pressable, Image } from "react-native";
+import { View, Text, StyleSheet, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { auth } from "../../services/firebase";
 import { saveDevice } from "../../services/deviceStore";
 
-function FlowHeader({ title }) {
+function FlowHeader({ title, onBack }) {
   return (
     <LinearGradient colors={["#0B3A8D", "#061A33"]} style={styles.header}>
       <SafeAreaView edges={["top"]}>
         <View style={styles.headerRow}>
-          <View style={{ width: 42 }} />
+          <Pressable onPress={onBack} style={styles.backBtn} hitSlop={10}>
+            <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
+          </Pressable>
           <Text style={styles.headerTitle}>{title}</Text>
           <View style={{ width: 42 }} />
         </View>
@@ -73,7 +75,8 @@ export default function PairBluetoothScreen({ navigation, route }) {
 
   return (
     <View style={styles.root}>
-      <FlowHeader title="BLUETOOTH" />
+      {/* ✅ Header copied from ScanDevicesScreen style */}
+      <FlowHeader title="BLUETOOTH" onBack={() => navigation.goBack()} />
 
       {step === "pairing" ? (
         <View style={styles.content}>
@@ -87,10 +90,6 @@ export default function PairBluetoothScreen({ navigation, route }) {
 
           <Pressable style={styles.primaryBtn} onPress={onSimulateSuccess}>
             <Text style={styles.primaryBtnText}>Simulate Success</Text>
-          </Pressable>
-
-          <Pressable style={styles.secondaryBtn} onPress={() => navigation.goBack()}>
-            <Text style={styles.secondaryText}>Back</Text>
           </Pressable>
         </View>
       ) : (
@@ -126,6 +125,7 @@ const styles = StyleSheet.create({
 
   header: { paddingHorizontal: 16, paddingBottom: 14 },
   headerRow: { height: 64, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  backBtn: { width: 42, height: 42, alignItems: "center", justifyContent: "center", borderRadius: 999 },
   headerTitle: { color: "#fff", fontSize: 18, fontWeight: "900" },
 
   content: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 18 },

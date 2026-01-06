@@ -20,7 +20,6 @@ export default function ForgotPasswordSentScreen({ navigation, route }) {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
-  // ✅ Match Login screen layout defaults
   const [headerH, setHeaderH] = useState(170);
 
   const GAP_AFTER_HEADER = Math.round(Math.min(28, Math.max(14, height * 0.025)));
@@ -51,7 +50,6 @@ export default function ForgotPasswordSentScreen({ navigation, route }) {
   return (
     <LinearGradient colors={["#0B3A8D", "#0B1220"]} style={styles.bg}>
       <SafeAreaView style={styles.safe}>
-        {/* ✅ Blue area (same as Login) */}
         <View style={[styles.blueArea, { height: BLUE_AREA_HEIGHT }]}>
           <View
             style={[styles.header, { transform: [{ translateY: -HEADER_SHIFT_UP }] }]}
@@ -62,7 +60,6 @@ export default function ForgotPasswordSentScreen({ navigation, route }) {
           </View>
         </View>
 
-        {/* ✅ White card pinned (same as Login) */}
         <View style={[styles.card, { top: cardTop }]}>
           <ScrollView
             keyboardShouldPersistTaps="handled"
@@ -71,7 +68,6 @@ export default function ForgotPasswordSentScreen({ navigation, route }) {
             contentContainerStyle={[styles.cardContent, { paddingTop: CONTENT_TOP_PADDING }]}
           >
             <View style={styles.contentWrap}>
-              {/* Back */}
               <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={10}>
                 <Ionicons name="chevron-back" size={22} color="#0B1220" />
                 <Text style={styles.backLabel}>Verification</Text>

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { View, Text, StyleSheet, Pressable, TextInput, Alert, Image, ScrollView } from "react-native";
+import { View, Text, StyleSheet, Pressable, TextInput, Alert, Image, ScrollView, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -12,7 +12,10 @@ export default function EditPasswordScreen({ navigation }) {
   const [confirm, setConfirm] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // ✅ same as SignUpScreen
+  const [successVisible, setSuccessVisible] = useState(false);
+
+  const [reloginVisible, setReloginVisible] = useState(false);
+
   const isStrongPassword = (v) => /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(v);
 
   const fieldErrors = useMemo(() => {
@@ -33,11 +36,19 @@ export default function EditPasswordScreen({ navigation }) {
     isStrongPassword(newPass) &&
     newPass === confirm;
 
+  const closeSuccess = () => {
+    setSuccessVisible(false);
+    navigation.navigate({
+      name: "EditProfile",
+      params: { updated: "password" },
+      merge: true,
+    });
+  };
+
   const onSave = async () => {
     const u = auth.currentUser;
     if (!u) return Alert.alert("Not logged in", "Please login again.");
 
-    // ✅ same checks as SignUpScreen
     if (!isStrongPassword(newPass)) {
       return Alert.alert(
         "Weak password",
@@ -49,31 +60,25 @@ export default function EditPasswordScreen({ navigation }) {
     try {
       setSaving(true);
       await updatePassword(u, newPass);
-      Alert.alert("Saved", "Your password has been updated.");
-      navigation.goBack();
+
+      setSuccessVisible(true);
     } catch (e) {
       if (e?.code === "auth/requires-recent-login") {
-        Alert.alert(
-          "Re-login required",
-          "For security, please confirm your password again.",
-          [
-            { text: "Cancel", style: "cancel" },
-            {
-              text: "Continue",
-              onPress: () =>
-                navigation.navigate("ConfirmPassword", {
-                  next: "EditPassword",
-                  title: "Confirm Password",
-                }),
-            },
-          ]
-        );
+        setReloginVisible(true);
       } else {
         Alert.alert("Update failed", e?.message || "Please try again.");
       }
     } finally {
       setSaving(false);
     }
+  };
+
+  const onContinueRelogin = () => {
+    setReloginVisible(false);
+    navigation.navigate("ConfirmPassword", {
+      next: "EditPassword",
+      title: "Confirm Password",
+    });
   };
 
   return (
@@ -132,6 +137,50 @@ export default function EditPasswordScreen({ navigation }) {
 
         <View style={{ height: 28 }} />
       </ScrollView>
+
+      <Modal visible={successVisible} animationType="fade" transparent onRequestClose={() => setSuccessVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Password Updated</Text>
+            <Text style={styles.modalSub}>Your password has been updated successfully.</Text>
+
+            <View style={styles.modalActions}>
+              <Pressable style={[styles.modalBtn, styles.modalBtnPrimary]} onPress={closeSuccess}>
+                <Text style={styles.modalBtnPrimaryText}>OK</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={reloginVisible} animationType="fade" transparent onRequestClose={() => setReloginVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Re-login required</Text>
+            <Text style={styles.modalSub}>
+              For security, please confirm your password again before updating your password.
+            </Text>
+
+            <View style={styles.modalActions}>
+              <Pressable
+                style={[styles.modalBtn, styles.modalBtnSecondary]}
+                onPress={() => setReloginVisible(false)}
+                disabled={saving}
+              >
+                <Text style={styles.modalBtnSecondaryText}>Cancel</Text>
+              </Pressable>
+
+              <Pressable
+                style={[styles.modalBtn, styles.modalBtnPrimary]}
+                onPress={onContinueRelogin}
+                disabled={saving}
+              >
+                <Text style={styles.modalBtnPrimaryText}>Continue</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -182,7 +231,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
 
-  // ✅ same style name you used in SignUpScreen
   fieldError: {
     width: "100%",
     color: "#D23B3B",
@@ -202,4 +250,48 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   saveText: { color: "#FFFFFF", fontSize: 13, fontWeight: "900" },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 18,
+  },
+  modalCard: {
+    width: "92%",       
+    maxWidth: 420,      
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 20,         
+    borderWidth: 1,
+    borderColor: "#D8E0EF",
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#0B1220",
+    textAlign: "center",
+  },
+  modalSub: {
+    marginTop: 8,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#6B7A99",
+    textAlign: "center",
+    lineHeight: 16,
+  },
+  modalActions: { flexDirection: "row", gap: 10, marginTop: 14 },
+  modalBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: "center" },
+
+  modalBtnSecondary: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#D8E0EF",
+  },
+  modalBtnSecondaryText: { color: "#6B7A99", fontWeight: "900", fontSize: 12 },
+
+  modalBtnPrimary: { backgroundColor: "#2F5FE8" },
+  modalBtnPrimaryText: { color: "#FFFFFF", fontWeight: "900", fontSize: 12 },
 });

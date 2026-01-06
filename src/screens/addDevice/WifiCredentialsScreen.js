@@ -63,9 +63,6 @@ export default function WifiCredentialsScreen({ navigation, route }) {
             <Text style={styles.primaryBtnText}>Connect Device</Text>
           </Pressable>
 
-          <Pressable style={styles.secondaryBtn} onPress={() => navigation.goBack()}>
-            <Text style={styles.secondaryBtnText}>Back</Text>
-          </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>

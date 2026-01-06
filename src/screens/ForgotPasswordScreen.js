@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   useWindowDimensions,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -25,7 +26,6 @@ export default function ForgotPasswordScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // ✅ Match Login screen layout defaults
   const [headerH, setHeaderH] = useState(170);
 
   const GAP_AFTER_HEADER = Math.round(Math.min(28, Math.max(14, height * 0.025)));
@@ -49,6 +49,30 @@ export default function ForgotPasswordScreen({ navigation }) {
     if (!isValidEmail(emailLower)) return "Enter a valid email address.";
     return "";
   }, [touched, emailLower]);
+
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [keyboardH, setKeyboardH] = useState(0);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardOpen(true);
+      const h = e?.endCoordinates?.height ?? 0;
+      setKeyboardH(h);
+    });
+
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardOpen(false);
+      setKeyboardH(0);
+    });
+
+    return () => {
+      showSub?.remove?.();
+      hideSub?.remove?.();
+    };
+  }, []);
 
   const onConfirm = async () => {
     setTouched(true);
@@ -79,10 +103,12 @@ export default function ForgotPasswordScreen({ navigation }) {
     }
   };
 
+  const EXTRA_BOTTOM_SPACE = 18;
+  const dynamicBottomPad = keyboardOpen ? keyboardH + EXTRA_BOTTOM_SPACE : EXTRA_BOTTOM_SPACE;
+
   return (
     <LinearGradient colors={["#0B3A8D", "#0B1220"]} style={styles.bg}>
       <SafeAreaView style={styles.safe}>
-        {/* ✅ Blue area (same as Login) */}
         <View style={[styles.blueArea, { height: BLUE_AREA_HEIGHT }]}>
           <View
             style={[styles.header, { transform: [{ translateY: -HEADER_SHIFT_UP }] }]}
@@ -93,20 +119,27 @@ export default function ForgotPasswordScreen({ navigation }) {
           </View>
         </View>
 
-        {/* ✅ White card pinned (same as Login) */}
         <View style={[styles.card, { top: cardTop }]}>
           <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
             style={{ flex: 1 }}
+            enabled={keyboardOpen}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            keyboardVerticalOffset={0}
           >
             <ScrollView
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={[styles.cardContent, { paddingTop: CONTENT_TOP_PADDING }]}
+              automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+              contentContainerStyle={[
+                styles.cardContent,
+                {
+                  paddingTop: CONTENT_TOP_PADDING,
+                  paddingBottom: 20 + dynamicBottomPad,
+                },
+              ]}
             >
               <View style={styles.contentWrap}>
-                {/* Back */}
                 <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={10}>
                   <Ionicons name="chevron-back" size={22} color="#0B1220" />
                   <Text style={styles.backLabel}>Login</Text>
@@ -135,6 +168,8 @@ export default function ForgotPasswordScreen({ navigation }) {
                   autoCapitalize="none"
                   keyboardType="email-address"
                   style={styles.input}
+                  returnKeyType="done"
+                  onSubmitEditing={() => Keyboard.dismiss()}
                 />
 
                 {!!fieldError && <Text style={styles.error}>{fieldError}</Text>}
@@ -170,7 +205,6 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
 
-  // ✅ Match Login sizing
   logo: { width: 112, height: 112 },
   brand: { fontSize: 40, fontWeight: "800", color: "white", marginTop: 4 },
 

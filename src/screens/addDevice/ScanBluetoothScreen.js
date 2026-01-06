@@ -1,8 +1,24 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, Pressable, Image, ScrollView } from "react-native";
+import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+
+function FlowHeader({ title, onBack }) {
+  return (
+    <LinearGradient colors={["#0B3A8D", "#061A33"]} style={styles.header}>
+      <SafeAreaView edges={["top"]}>
+        <View style={styles.headerRow}>
+          <Pressable onPress={onBack} style={styles.backBtn} hitSlop={10}>
+            <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
+          </Pressable>
+          <Text style={styles.headerTitle}>{title}</Text>
+          <View style={{ width: 42 }} />
+        </View>
+      </SafeAreaView>
+    </LinearGradient>
+  );
+}
 
 function DeviceRow({ name, strengthLabel, onPress }) {
   return (
@@ -54,17 +70,7 @@ export default function ScanBluetoothScreen({ navigation }) {
 
   return (
     <View style={styles.root}>
-      <LinearGradient colors={["#0B3A8D", "#061A33"]} style={styles.header}>
-        <SafeAreaView edges={["top"]}>
-          <View style={styles.headerRow}>
-            <View style={styles.brandRow}>
-              <Image source={require("../../../assets/logo.png")} style={styles.headerLogo} resizeMode="contain" />
-              <Text style={styles.headerBrand}>AquaVolt</Text>
-            </View>
-            <View style={{ width: 42 }} />
-          </View>
-        </SafeAreaView>
-      </LinearGradient>
+      <FlowHeader title="Scan" onBack={() => navigation.goBack()} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <View style={styles.titleWrap}>
@@ -82,12 +88,7 @@ export default function ScanBluetoothScreen({ navigation }) {
             </View>
           ) : (
             devices.map((d) => (
-              <DeviceRow
-                key={d.id}
-                name={d.name}
-                strengthLabel={d.strength}
-                onPress={() => onSelect(d)}
-              />
+              <DeviceRow key={d.id} name={d.name} strengthLabel={d.strength} onPress={() => onSelect(d)} />
             ))
           )}
 
@@ -96,10 +97,6 @@ export default function ScanBluetoothScreen({ navigation }) {
             <Text style={styles.refreshText}>{scanning ? "Refreshing..." : "Refresh"}</Text>
           </Pressable>
         </View>
-
-        <Pressable style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.backText}>Back</Text>
-        </Pressable>
 
         <View style={{ height: 26 }} />
       </ScrollView>
@@ -112,9 +109,8 @@ const styles = StyleSheet.create({
 
   header: { paddingHorizontal: 16, paddingBottom: 14 },
   headerRow: { height: 64, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  brandRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  headerLogo: { width: 38, height: 38 },
-  headerBrand: { color: "#fff", fontSize: 22, fontWeight: "900" },
+  backBtn: { width: 42, height: 42, alignItems: "center", justifyContent: "center", borderRadius: 999 },
+  headerTitle: { color: "#fff", fontSize: 18, fontWeight: "900" },
 
   content: { paddingTop: 14, paddingBottom: 10, alignItems: "center" },
 
@@ -187,7 +183,7 @@ const styles = StyleSheet.create({
   },
   refreshText: { fontSize: 12, fontWeight: "900", color: "#0B1220" },
 
-  backBtn: {
+  backScreenBtn: {
     marginTop: 12,
     width: "86%",
     maxWidth: 380,

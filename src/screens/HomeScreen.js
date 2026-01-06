@@ -75,7 +75,6 @@ function EnergyCard({ kwh = 5.3, target = 6.2 }) {
 
       <View style={styles.energyFooter}>
         <Text style={styles.energyFooterText}>{pct}% of Production</Text>
-        <Text style={styles.energyFooterText}>Target: {target.toFixed(1)} kWh/day</Text>
       </View>
     </View>
   );
@@ -110,13 +109,11 @@ export default function HomeScreen({ navigation }) {
   const refreshAll = useCallback(async () => {
     const uid = auth.currentUser?.uid;
 
-    // 1) Device (per-user)
     setLoadingDevice(true);
     const d = await getSavedDevice(uid);
     setDevice(d);
     setLoadingDevice(false);
 
-    // 2) Name (Realtime DB)
     setLoadingName(true);
     const dbName = await fetchFullName(uid);
 
@@ -147,7 +144,6 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <View style={styles.page}>
-      {/* Header */}
       <LinearGradient colors={["#0B3A8D", "#061A33"]} style={styles.header}>
         <SafeAreaView edges={["top"]}>
           <View style={styles.headerRow}>
@@ -162,19 +158,18 @@ export default function HomeScreen({ navigation }) {
           </View>
         </SafeAreaView>
       </LinearGradient>
-
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* ✅ Page heading OUTSIDE the card (like Sensors) */}
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.pageTitleWrap}>
-          <Text style={styles.pageTitle}>
-            Welcome, {loadingName ? "..." : fullName}
-          </Text>
+          <Text style={styles.pageTitle}>Welcome, {loadingName ? "..." : fullName}</Text>
           <Text style={styles.pageSub}>Realtime monitoring</Text>
         </View>
 
-        {/* ✅ NO DEVICE YET */}
         {!loadingDevice && !device && (
-          <View style={styles.welcomeCard}>
+          <View style={styles.emptyWrap}>
             <Text style={styles.noDeviceTitle}>No device connected yet</Text>
             <Text style={styles.noDeviceSub}>
               Add your AquaVolt ESP32 device to start monitoring sensor data and energy production.
@@ -185,13 +180,12 @@ export default function HomeScreen({ navigation }) {
 
               <Pressable onPress={goAddDevice} style={styles.quickBtn}>
                 <Ionicons name="add" size={18} color="#2F5FE8" />
-                <Text style={styles.quickBtnText}>Add Another Device</Text>
+                <Text style={styles.quickBtnText}>Add Device</Text>
               </Pressable>
             </View>
           </View>
         )}
 
-        {/* ✅ DEVICE EXISTS → dashboard */}
         {!loadingDevice && !!device && (
           <>
             <View style={styles.welcomeCard}>
@@ -216,24 +210,24 @@ export default function HomeScreen({ navigation }) {
             </View>
 
             <EnergyCard kwh={5.3} target={6.2} />
-            <View style={{ height: 18 }} />
           </>
         )}
 
-        {/* Loading state */}
         {loadingDevice && (
-          <View style={styles.welcomeCard}>
+          <View style={styles.loadingCard}>
             <Text style={styles.noDeviceTitle}>Loading...</Text>
             <Text style={styles.noDeviceSub}>Checking your connected device.</Text>
           </View>
         )}
+
+        <View style={{ height: 28 }} />
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: "#EEF5F9" },
+  page: { flex: 1, backgroundColor: "#EAF6FF" },
 
   header: { paddingHorizontal: 16, paddingBottom: 14 },
   headerRow: { height: 64, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
@@ -242,28 +236,43 @@ const styles = StyleSheet.create({
   headerBrand: { color: "#fff", fontSize: 22, fontWeight: "900" },
   bellBtn: { padding: 10, borderRadius: 999 },
 
-  content: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 20 },
+  scroll: { flex: 1 },
+  scrollContent: { alignItems: "center", paddingTop: 14, paddingBottom: 10 },
 
-  /* ✅ Title outside card (match Sensors layout) */
-  pageTitleWrap: { paddingHorizontal: 2, marginBottom: 10 },
+  pageTitleWrap: { width: "86%", maxWidth: 360, marginBottom: 12 },
   pageTitle: { fontSize: 22, fontWeight: "900", color: "#0B1220" },
   pageSub: { marginTop: 2, fontSize: 12, color: "#7C8AA6", fontWeight: "600" },
 
   welcomeCard: {
+    width: "86%",
+    maxWidth: 360,
     backgroundColor: "#F7FBFF",
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
     borderColor: "#D7E3F2",
+    marginTop: 6,
   },
+
   divider: { height: 1, backgroundColor: "#D7E3F2", marginVertical: 10 },
 
   noDeviceTitle: { fontSize: 14, fontWeight: "900", color: "#0B1220" },
   noDeviceSub: { marginTop: 6, fontSize: 12, fontWeight: "700", color: "#7C8AA6", lineHeight: 16 },
 
+  emptyWrap: {
+    width: "86%",
+    maxWidth: 360,
+    backgroundColor: "#F7FBFF",
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#D7E3F2",
+    marginTop: 6,
+  },
+
   quickCard: {
     marginTop: 14,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F7FBFF",
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
@@ -310,6 +319,8 @@ const styles = StyleSheet.create({
   tileMeta: { color: "rgba(255,255,255,0.9)", fontSize: 14, fontWeight: "500" },
 
   energyCard: {
+    width: "86%",
+    maxWidth: 360,
     marginTop: 14,
     backgroundColor: "#FFFFFF",
     borderRadius: 14,
@@ -327,4 +338,15 @@ const styles = StyleSheet.create({
 
   energyFooter: { marginTop: 10, flexDirection: "row", justifyContent: "space-between" },
   energyFooterText: { fontSize: 11, fontWeight: "800", color: "#6B7A99" },
+
+  loadingCard: {
+    width: "86%",
+    maxWidth: 360,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#D7E3F2",
+    marginTop: 6,
+  },
 });

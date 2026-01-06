@@ -4,7 +4,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { auth, db } from "../services/firebase";
 import { logout } from "../services/auth";
-
 import { ref, get, update, serverTimestamp } from "firebase/database";
 import { reload, sendEmailVerification, verifyBeforeUpdateEmail } from "firebase/auth";
 
@@ -25,13 +24,11 @@ async function fetchPendingEmail(uid) {
   }
 }
 
-// small helper to retry reload once (fixes your “first OK fails” issue)
 async function reloadWithRetry(user) {
   try {
     await reload(user);
     return true;
   } catch (e) {
-    // retry once (no UI waiting message needed, just do it)
     try {
       await new Promise((r) => setTimeout(r, 700));
       await reload(user);
@@ -58,16 +55,13 @@ export default function VerifyEmailScreen({ navigation }) {
         return;
       }
 
-      // ✅ reload (with retry) so emailVerified/email are updated
       await reloadWithRetry(user);
 
       const uid = user.uid;
       const authEmail = (user.email || "").trim().toLowerCase();
 
-      // ✅ pull pendingEmail from RTDB (used for syncing + resend)
       const pending = await fetchPendingEmail(uid);
 
-      // If Firebase says verified, sync EVERYTHING properly
       if (user.emailVerified) {
         await update(ref(db, `users/${uid}`), {
           email: authEmail || pending?.pendingEmail || pending?.dbEmail || null,
@@ -75,29 +69,22 @@ export default function VerifyEmailScreen({ navigation }) {
           emailVerified: true,
           verifiedAt: serverTimestamp(),
 
-          // ✅ finalize email-change flow
           pendingEmail: null,
           pendingEmailLower: null,
         });
 
-        // ✅ enforce your rule: must login again after verification
         await logout();
         navigation.replace("Login");
         return;
       }
 
-      // Not verified yet
       setMsg("Not verified yet. Check inbox/spam then tap OK again.");
     } catch (e) {
-      // show something more useful than generic
       const code = e?.code || "";
       const friendly =
         code === "auth/user-token-expired"
-          ? "Session expired. Please log in again."
+          ? "Please re-log in again."
           : code === "auth/network-request-failed"
-          ? "Network error. Check connection and try again."
-          : "Could not check verification. Try again.";
-
       setMsg(friendly);
 
       if (code === "auth/user-token-expired") {
@@ -123,7 +110,6 @@ export default function VerifyEmailScreen({ navigation }) {
         return;
       }
 
-      // always reload before resend, so we don’t resend unnecessarily
       await reloadWithRetry(user);
 
       if (user.emailVerified) {
@@ -134,14 +120,12 @@ export default function VerifyEmailScreen({ navigation }) {
       const uid = user.uid;
       const pending = await fetchPendingEmail(uid);
 
-      // ✅ If they’re changing email, resend verification to pendingEmail
       if (pending?.pendingEmail) {
         await verifyBeforeUpdateEmail(user, pending.pendingEmail);
         setMsg("Verification email resent to your NEW email. Check inbox/spam.");
         return;
       }
 
-      // ✅ normal signup verification resend
       await sendEmailVerification(user);
       setMsg("Verification email resent. Please check your inbox/spam.");
     } catch (e) {
@@ -156,8 +140,6 @@ export default function VerifyEmailScreen({ navigation }) {
       setMsg(friendly);
 
       if (code === "auth/requires-recent-login") {
-        // Optional: force them back to login, since they need reauth anyway
-        // navigation.replace("Login");
       }
     } finally {
       setLoading(false);

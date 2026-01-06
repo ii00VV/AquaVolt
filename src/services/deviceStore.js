@@ -24,7 +24,6 @@ export async function saveDevice(uid, deviceObj) {
   }
 }
 
-// ✅ merge updates into saved device
 export async function updateDevice(uid, patch) {
   try {
     const current = (await getSavedDevice(uid)) || {};
@@ -36,17 +35,15 @@ export async function updateDevice(uid, patch) {
   }
 }
 
-// ✅ helper: switch mode and keep fields consistent
 export async function setConnectionType(uid, connectionType) {
   const base = (await getSavedDevice(uid)) || {};
   const next = {
     ...base,
-    connectionType, // "wifi" | "bluetooth"
+    connectionType,
     status: "Online",
     updatedAt: Date.now(),
   };
 
-  // keep some defaults if missing (so UI doesn't break)
   if (!next.name) next.name = "AquaVolt Monitor";
   if (!next.id) next.id = "AquaVolt-ESP32-A1";
   if (!next.model) next.model = "ESP32-WROOM-32";
@@ -81,13 +78,11 @@ export async function clearDevice(uid) {
   }
 }
 
-/* ---------------- helpers ---------------- */
 
 function isObject(v) {
   return v && typeof v === "object" && !Array.isArray(v);
 }
 
-// deep merge so nested wifi/bluetooth updates work
 function deepMerge(target, source) {
   if (!isObject(target) || !isObject(source)) return source;
   const out = { ...target };

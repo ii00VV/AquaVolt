@@ -1,4 +1,3 @@
-// src/screens/ConnectivitySettingsScreen.js
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -82,12 +81,10 @@ export default function ConnectivitySettingsScreen({ navigation }) {
   const onSwitchToBluetooth = () => goAddDeviceFlowTo("EnableBluetooth");
 
   const onDisconnectBluetooth = async () => {
-    // keep it simple + immediate; if you still want confirm, tell me
     await updateDevice(uid, { bluetooth: { statusLabel: "Disconnected" } });
     await refresh();
   };
 
-  // No device
   if (!loading && !device) {
     return (
       <View style={styles.root}>
@@ -104,7 +101,6 @@ export default function ConnectivitySettingsScreen({ navigation }) {
         </LinearGradient>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-          {/* ✅ Back button BELOW header */}
           <Pressable style={styles.backInline} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={16} color="#2F5FE8" />
             <Text style={styles.backInlineText}>Back</Text>
@@ -145,7 +141,6 @@ export default function ConnectivitySettingsScreen({ navigation }) {
       </LinearGradient>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        {/* ✅ Back button BELOW header */}
         <Pressable style={styles.backInline} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={16} color="#2F5FE8" />
           <Text style={styles.backInlineText}>Back</Text>
@@ -156,7 +151,6 @@ export default function ConnectivitySettingsScreen({ navigation }) {
           <Text style={styles.sub}>Manage device connection methods</Text>
         </View>
 
-        {/* Current Connection */}
         <Card>
           <Text style={styles.cardTitle}>Current Connection</Text>
 
@@ -174,7 +168,6 @@ export default function ConnectivitySettingsScreen({ navigation }) {
           </View>
         </Card>
 
-        {/* Switch Connection Method (opposite only) */}
         <Card>
           <Text style={styles.cardTitle}>Switch Connection Method</Text>
 
@@ -193,7 +186,6 @@ export default function ConnectivitySettingsScreen({ navigation }) {
           )}
         </Card>
 
-        {/* WiFi Configuration (only when WiFi) — ✅ button removed */}
         {!isBt && (
           <Card>
             <View style={styles.wifiHeader}>
@@ -207,7 +199,6 @@ export default function ConnectivitySettingsScreen({ navigation }) {
           </Card>
         )}
 
-        {/* Bluetooth Pairing (only when BT) */}
         {isBt && (
           <Card>
             <View style={styles.btHeader}>
@@ -219,14 +210,9 @@ export default function ConnectivitySettingsScreen({ navigation }) {
             <Row left="Signal" right={`Strong (RSSI: ${bt.rssi ?? -52})`} rightColor="#0F9D58" />
             <Row left="Status" right={bt.statusLabel || "Connected"} rightColor="#0F9D58" />
 
-            <Pressable style={styles.disconnectBtn} onPress={onDisconnectBluetooth}>
-              <Ionicons name="bluetooth" size={18} color="#C91515" />
-              <Text style={styles.disconnectText}>Disconnect Bluetooth</Text>
-            </Pressable>
           </Card>
         )}
 
-        {/* Tips */}
         <View style={styles.tips}>
           <View style={styles.tipsTitleRow}>
             <Ionicons name="information-circle-outline" size={18} color="#2F5FE8" />
@@ -256,7 +242,6 @@ const styles = StyleSheet.create({
 
   content: { alignItems: "center", paddingTop: 12, paddingBottom: 10 },
 
-  // ✅ Back button below header
   backInline: {
     width: "86%",
     maxWidth: 380,
@@ -264,6 +249,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     paddingVertical: 6,
+    marginBottom: 6,
   },
   backInlineText: { color: "#2F5FE8", fontWeight: "800", fontSize: 12 },
 

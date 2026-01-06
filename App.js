@@ -17,7 +17,6 @@ import EditProfileScreen from "./src/screens/EditProfileScreen";
 import EditNameScreen from "./src/screens/EditNameScreen";
 import EditEmailScreen from "./src/screens/EditEmailScreen";
 import EditPasswordScreen from "./src/screens/EditPasswordScreen";
-import ConfirmPasswordScreen from "./src/screens/ConfirmPasswordScreen";
 
 
 const Stack = createNativeStackNavigator();
@@ -69,7 +68,6 @@ export default function App() {
         <Stack.Screen name="EditName" component={EditNameScreen} options={{ headerShown: false }} />
         <Stack.Screen name="EditEmail" component={EditEmailScreen} options={{ headerShown: false }} />
         <Stack.Screen name="EditPassword" component={EditPasswordScreen} options={{ headerShown: false }} />
-        <Stack.Screen name="ConfirmPassword" component={ConfirmPasswordScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

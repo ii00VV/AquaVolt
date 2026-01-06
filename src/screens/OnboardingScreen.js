@@ -94,7 +94,7 @@ export default function OnboardingScreen({ navigation }) {
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.listContent} // ✅ adds space so footer doesn't cover content
+            contentContainerStyle={styles.listContent}
             getItemLayout={(_, i) => ({
               length: width,
               offset: width * i,
@@ -109,7 +109,6 @@ export default function OnboardingScreen({ navigation }) {
             }}
           />
 
-          {/* ✅ Bottom-anchored footer (dots + buttons) */}
           <View style={styles.footer}>
             <View style={styles.dotsRow}>
               {slides.map((_, i) => (
@@ -150,9 +149,8 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   body: { flex: 1 },
 
-  // ✅ reserve enough space at bottom so slide text/icons don't get hidden behind footer
   listContent: {
-    paddingBottom: 140, // adjust 130–160 if needed
+    paddingBottom: 140,
   },
 
   slide: {
@@ -186,12 +184,11 @@ const styles = StyleSheet.create({
     maxWidth: 320,
   },
 
-  // ✅ This is the key: footer anchored to the bottom
   footer: {
     position: "absolute",
     left: 0,
     right: 0,
-    bottom: 10, // ✅ smaller = closer to bottom
+    bottom: 10,
     paddingHorizontal: 22,
   },
 
@@ -200,7 +197,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     gap: 8,
-    marginBottom: 8, // ✅ smaller gap like your reference
+    marginBottom: 8,
   },
   dot: {
     width: 8,

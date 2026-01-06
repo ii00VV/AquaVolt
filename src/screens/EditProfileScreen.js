@@ -61,6 +61,10 @@ export default function EditProfileScreen({ navigation }) {
     return unsub;
   }, [navigation, refresh]);
 
+  const goBackToProfileTab = () => {
+     navigation.navigate("MainTabs", { screen: "Profile" });
+  };
+
   return (
     <View style={styles.root}>
       <LinearGradient colors={["#0B3A8D", "#061A33"]} style={styles.header}>
@@ -76,7 +80,7 @@ export default function EditProfileScreen({ navigation }) {
       </LinearGradient>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Pressable style={styles.backRow} onPress={() => navigation.goBack()}>
+        <Pressable style={styles.backRow} onPress={goBackToProfileTab}>
           <Ionicons name="chevron-back" size={18} color="#0B1220" />
           <Text style={styles.backText}>Edit Profile</Text>
         </Pressable>

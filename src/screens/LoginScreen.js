@@ -22,18 +22,15 @@ import Constants from "expo-constants";
 
 WebBrowser.maybeCompleteAuthSession();
 
-// ✅ Your Google OAuth client IDs
 const WEB_CLIENT_ID =
   "94977781048-c9psb541blo0nnlc3plmhlu4sk3b0clt.apps.googleusercontent.com";
 const IOS_CLIENT_ID =
   "94977781048-2bo7fevnefuj4li0n5eqde7hgn0ekaid.apps.googleusercontent.com";
 const ANDROID_CLIENT_ID =
   "94977781048-8lb9sbv7f3qegi3oshv28m1blhffhubn.apps.googleusercontent.com";
-
-// ✅ Must match your Expo account + slug EXACTLY
+CTLY
 const PROJECT_NAME_FOR_PROXY = "@llowww/aquavolt";
 
-// ✅ The correct Expo proxy redirect URI
 const EXPO_PROXY_REDIRECT_URI = `https://auth.expo.io/${PROJECT_NAME_FOR_PROXY}`;
 
 function randomNonce(len = 32) {
@@ -69,17 +66,10 @@ export default function LoginScreen({ navigation }) {
 
   const isValidEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
-  // ✅ Detect Expo Go
   const isExpoGo = Constants.appOwnership === "expo";
 
-  // ✅ Nonce for id_token flow (Google recommended)
   const nonce = useMemo(() => randomNonce(32), []);
 
-  /**
-   * ✅ FINAL: Two modes
-   * - Expo Go: use PROXY + WEB CLIENT + IMPLICIT id_token (NO PKCE)
-   * - Dev Client / Builds: use native IDs (you can keep this for later)
-   */
   const googleConfig = useMemo(() => {
     if (isExpoGo) {
       return {
@@ -97,7 +87,6 @@ export default function LoginScreen({ navigation }) {
       };
     }
 
-    // For real builds (later)
     const nativeRedirectUri = AuthSession.makeRedirectUri({ scheme: "aquavolt" });
     return {
       expoClientId: WEB_CLIENT_ID,
@@ -121,7 +110,6 @@ export default function LoginScreen({ navigation }) {
     if (request?.url) console.log("GOOGLE AUTH URL:", request.url);
   }, [isExpoGo, request?.url]);
 
-  // ✅ Handle Google login result -> Firebase
   useEffect(() => {
     if (!response) return;
 
@@ -203,10 +191,8 @@ export default function LoginScreen({ navigation }) {
       setPwError("");
 
       await promptAsync({
-        // ✅ Expo Go proxy
         useProxy: isExpoGo,
         projectNameForProxy: isExpoGo ? PROJECT_NAME_FOR_PROXY : undefined,
-        // ✅ DO NOT use ephemeral here (can break 2-step on some setups)
         preferEphemeralSession: false,
       });
     } catch (e) {
@@ -300,8 +286,6 @@ export default function LoginScreen({ navigation }) {
                   </Text>
                 </Pressable>
               )}
-
-              {/* ✅ Google SSO */}
               <View style={styles.ssoBlock}>
                 <View style={styles.dividerRow}>
                   <View style={styles.dividerLine} />
@@ -427,7 +411,6 @@ const styles = StyleSheet.create({
   footerText: { color: "#6A7CA3", fontSize: 12 },
   footerLink: { color: "#3D73E0", fontWeight: "800", fontSize: 12 },
 
-  // SSO
   ssoBlock: { marginTop: 18 },
   dividerRow: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
   dividerLine: { flex: 1, height: 1, backgroundColor: "#D2D8E6" },

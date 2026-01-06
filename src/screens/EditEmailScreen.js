@@ -47,11 +47,8 @@ export default function EditEmailScreen({ navigation }) {
     try {
       setSaving(true);
 
-      // ✅ refresh auth user first
       await reload(u);
 
-      // ✅ If user isn't verified yet, don't allow changing email
-      // (this prevents the exact error you saw)
       if (!u.emailVerified) {
         Alert.alert(
           "Verify your email first",
@@ -61,18 +58,14 @@ export default function EditEmailScreen({ navigation }) {
         return;
       }
 
-      // ✅ Block duplicates (RTDB check)
       const taken = await isEmailTaken(newEmail, uid);
       if (taken) {
         Alert.alert("Email taken", "That email is already registered.");
         return;
       }
 
-      // ✅ This sends a verification email to NEW address.
-      // Email will only actually change after they click the link.
       await verifyBeforeUpdateEmail(u, newEmail);
 
-      // ✅ mark app-side verification false until the change completes
       await update(ref(db, `users/${uid}`), {
         pendingEmail: newEmail,
         pendingEmailLower: newEmail,
@@ -80,7 +73,6 @@ export default function EditEmailScreen({ navigation }) {
         verifiedAt: null,
       });
 
-      // ✅ go verify screen (same flow as signup)
       navigation.navigate("VerifyEmail");
     } catch (e) {
       if (e?.code === "auth/requires-recent-login") {

@@ -1,4 +1,3 @@
-// src/services/auth.js
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -14,7 +13,6 @@ import {
 import { ref, set, update, get } from "firebase/database";
 import { auth, db } from "./firebase";
 
-// RTDB keys cannot include: . # $ [ ] /
 export function emailToKey(emailLower) {
   return emailLower
     .trim()
@@ -65,7 +63,6 @@ export async function signUpWithEmail({ fullName, email, password }) {
     provider: "password",
   });
 
-  // email index for quick "is email taken?"
   await set(ref(db, `emailIndex/${safeKey}`), cred.user.uid);
 
   return cred.user;
@@ -88,7 +85,6 @@ export async function loginWithEmail({ email, password }) {
     throw err;
   }
 
-  // (optional) record last login
   await update(ref(db, `users/${cred.user.uid}`), {
     lastLoginAt: Date.now(),
   });
@@ -96,7 +92,6 @@ export async function loginWithEmail({ email, password }) {
   return cred.user;
 }
 
-// ✅ Google SSO -> Firebase login
 export async function loginWithGoogleTokens({ idToken, accessToken }) {
   const a = requireAuth();
 
@@ -130,7 +125,7 @@ export async function loginWithGoogleTokens({ idToken, accessToken }) {
         fullName,
         email: emailLower,
         emailLower,
-        emailVerified: true, // Google emails are verified
+        emailVerified: true,
         createdAt: Date.now(),
         lastLoginAt: Date.now(),
         provider: "google",
@@ -154,7 +149,6 @@ export async function loginWithGoogleTokens({ idToken, accessToken }) {
 
     return user;
   } catch (e) {
-    // common: user exists with password for same email
     if (e?.code === "auth/account-exists-with-different-credential") {
       const err = new Error(
         "This email is already registered using Email/Password. Please log in with password first."

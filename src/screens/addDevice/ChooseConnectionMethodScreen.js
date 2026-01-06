@@ -26,7 +26,6 @@ function MethodCard({ icon, title, subtitle, note, onPress }) {
 export default function ChooseConnectionMethodScreen({ navigation }) {
   return (
     <View style={styles.root}>
-      {/* ✅ Header (same AquaVolt styling) */}
       <LinearGradient colors={["#0B3A8D", "#061A33"]} style={styles.header}>
         <SafeAreaView edges={["top"]}>
           <View style={styles.headerRow}>

@@ -26,16 +26,13 @@ export default function DeviceAddedScreen({ navigation, route }) {
   const onDone = async () => {
     const uid = auth.currentUser?.uid;
 
-    // ✅ Save device as WIFI mode (frontend only)
     await saveDevice(uid, {
       id: device?.id || "ESP32-AV-8F3D",
       name: device?.name || "AquaVolt Device",
 
-      // ✅ these are the fields your Device/Connectivity screens use
       status: "Online",
       connectionType: "wifi",
 
-      // optional info (matches your placeholders)
       model: "ESP32-WROOM-32",
       firmware: "v2.4.1",
 
@@ -47,7 +44,6 @@ export default function DeviceAddedScreen({ navigation, route }) {
         ip: "192.168.1.142",
       },
 
-      // keep bt info optional (can be used when switching later)
       bluetooth: {
         rssi: -52,
         statusLabel: "Disconnected",
@@ -57,7 +53,6 @@ export default function DeviceAddedScreen({ navigation, route }) {
       connectedAt: Date.now(),
     });
 
-    // ✅ close AddDeviceFlow and return to tabs (Device/Home)
     const parent = navigation.getParent?.();
     if (parent?.goBack) parent.goBack();
     else navigation.goBack();

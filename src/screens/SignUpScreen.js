@@ -10,6 +10,9 @@ import {
   ScrollView,
   SafeAreaView,
   useWindowDimensions,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -29,42 +32,45 @@ export default function SignUpScreen({ navigation }) {
   const [showPw2, setShowPw2] = useState(false);
   const [agree, setAgree] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  // ✅ match Login: default headerH so layout doesn't jump
   const [headerH, setHeaderH] = useState(170);
-
-  // ✅ match Login: same split behavior
   const GAP_AFTER_HEADER = Math.round(Math.min(28, Math.max(14, height * 0.025)));
-  const CARD_HEIGHT_CAP = Math.round(Math.min(560, height * 0.72)); // 👈 SAME AS LOGIN
-
+  const CARD_HEIGHT_CAP = Math.round(Math.min(560, height * 0.72));
   const minTop = headerH + GAP_AFTER_HEADER;
   const desiredTop = height - CARD_HEIGHT_CAP;
   const cardTop = Math.max(minTop, desiredTop);
-
   const BLUE_AREA_HEIGHT = cardTop;
-
-  // ✅ match Login: same white-card top padding behavior
   const CONTENT_TOP_PADDING = Math.round(Math.min(44, Math.max(26, height * 0.05)));
-
-  // ✅ match Login: shift logo+name up
   const HEADER_SHIFT_UP = Math.round(Math.min(24, Math.max(10, BLUE_AREA_HEIGHT * 0.08)));
-
   const [touched, setTouched] = useState({
     fullName: false,
     email: false,
     pw: false,
     pw2: false,
   });
-
   const [emailChecking, setEmailChecking] = useState(false);
   const [emailTaken, setEmailTaken] = useState(null);
   const [emailCheckError, setEmailCheckError] = useState("");
-
   const debounceRef = useRef(null);
   const currentEmailRef = useRef("");
   const emailCheckTokenRef = useRef(0);
-
   const [termsVisible, setTermsVisible] = useState(false);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      () => setKeyboardOpen(true)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => setKeyboardOpen(false)
+    );
+
+    return () => {
+      showSub?.remove?.();
+      hideSub?.remove?.();
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -173,8 +179,8 @@ These Terms and Conditions may be updated periodically to reflect system improve
     const e = {};
 
     const name = fullName.trim();
-    if (touched.fullName && name.length > 0 && name.length < 8) {
-      e.fullName = "Full name must be at least 8 characters.";
+    if (touched.fullName && name.length === 0) {
+      e.fullName = "Full name is required.";
     }
 
     const emailLower = email.trim().toLowerCase();
@@ -203,7 +209,7 @@ These Terms and Conditions may be updated periodically to reflect system improve
   const canSubmit =
     agree &&
     !loading &&
-    nameFinal.length >= 8 &&
+    nameFinal.length > 0 &&
     isValidEmail(emailLower) &&
     emailTaken === false &&
     isStrongPassword(pw) &&
@@ -215,7 +221,9 @@ These Terms and Conditions may be updated periodically to reflect system improve
 
     try {
       if (!agree) return;
-      if (nameFinal.length < 8) return;
+
+      if (nameFinal.length === 0) return;
+
       if (!isValidEmail(emailLower)) return;
 
       if (emailTaken === null) {
@@ -243,7 +251,6 @@ These Terms and Conditions may be updated periodically to reflect system improve
   return (
     <LinearGradient colors={["#0B3A8D", "#0B1220"]} style={styles.bg}>
       <SafeAreaView style={styles.safe}>
-        {/* ✅ EXACT same header structure as Login */}
         <View style={[styles.blueArea, { height: BLUE_AREA_HEIGHT }]}>
           <View
             style={[styles.header, { transform: [{ translateY: -HEADER_SHIFT_UP }] }]}
@@ -255,108 +262,116 @@ These Terms and Conditions may be updated periodically to reflect system improve
         </View>
 
         <View style={[styles.card, { top: cardTop }]}>
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={[styles.cardContent, { paddingTop: CONTENT_TOP_PADDING }]}
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            enabled={keyboardOpen}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            keyboardVerticalOffset={0}
           >
-            <Text style={styles.title}>Create Account</Text>
-            <Text style={styles.subtitle}>Sign in to monitor your system</Text>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              showsVerticalScrollIndicator={false}
+              automaticallyAdjustKeyboardInsets
+              contentContainerStyle={[styles.cardContent, { paddingTop: CONTENT_TOP_PADDING }]}
+            >
+              <Text style={styles.title}>Create Account</Text>
+              <Text style={styles.subtitle}>Sign in to monitor your system</Text>
 
-            <View style={styles.form}>
-              <TextInput
-                value={fullName}
-                onChangeText={(v) => {
-                  if (!touched.fullName) setTouched((t) => ({ ...t, fullName: true }));
-                  setFullName(v);
-                }}
-                onBlur={() => setFullName((v) => formatFullName(v))}
-                placeholder="Full Name"
-                placeholderTextColor="#8B97AD"
-                autoCapitalize="words"
-                style={styles.input}
-              />
-              {!!fieldErrors.fullName && <Text style={styles.fieldError}>{fieldErrors.fullName}</Text>}
-
-              <TextInput
-                value={email}
-                onFocus={() => {
-                  if (!touched.email) setTouched((t) => ({ ...t, email: true }));
-                }}
-                onChangeText={(v) => setEmail(v)}
-                placeholder="Email Address"
-                placeholderTextColor="#8B97AD"
-                autoCapitalize="none"
-                keyboardType="email-address"
-                style={styles.input}
-              />
-              {!!fieldErrors.email && <Text style={styles.fieldError}>{fieldErrors.email}</Text>}
-
-              <View style={styles.passwordWrap}>
+              <View style={styles.form}>
                 <TextInput
-                  value={pw}
+                  value={fullName}
                   onChangeText={(v) => {
-                    if (!touched.pw) setTouched((t) => ({ ...t, pw: true }));
-                    setPw(v);
+                    if (!touched.fullName) setTouched((t) => ({ ...t, fullName: true }));
+                    setFullName(v);
                   }}
-                  placeholder="Password"
+                  onBlur={() => setFullName((v) => formatFullName(v))}
+                  placeholder="Full Name"
                   placeholderTextColor="#8B97AD"
-                  secureTextEntry={!showPw}
-                  style={styles.passwordInput}
+                  autoCapitalize="words"
+                  style={styles.input}
                 />
-                <Pressable onPress={() => setShowPw((s) => !s)} style={styles.eyeBtn}>
-                  <Ionicons name={showPw ? "eye-off" : "eye"} size={22} color="#8B97AD" />
-                </Pressable>
-              </View>
-              {!!fieldErrors.pw && <Text style={styles.fieldError}>{fieldErrors.pw}</Text>}
+                {!!fieldErrors.fullName && <Text style={styles.fieldError}>{fieldErrors.fullName}</Text>}
 
-              <View style={styles.passwordWrap}>
                 <TextInput
-                  value={pw2}
-                  onChangeText={(v) => {
-                    if (!touched.pw2) setTouched((t) => ({ ...t, pw2: true }));
-                    setPw2(v);
+                  value={email}
+                  onFocus={() => {
+                    if (!touched.email) setTouched((t) => ({ ...t, email: true }));
                   }}
-                  placeholder="Confirm Password"
+                  onChangeText={(v) => setEmail(v)}
+                  placeholder="Email Address"
                   placeholderTextColor="#8B97AD"
-                  secureTextEntry={!showPw2}
-                  style={styles.passwordInput}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  style={styles.input}
                 />
-                <Pressable onPress={() => setShowPw2((s) => !s)} style={styles.eyeBtn}>
-                  <Ionicons name={showPw2 ? "eye-off" : "eye"} size={22} color="#8B97AD" />
-                </Pressable>
-              </View>
-              {!!fieldErrors.pw2 && <Text style={styles.fieldError}>{fieldErrors.pw2}</Text>}
+                {!!fieldErrors.email && <Text style={styles.fieldError}>{fieldErrors.email}</Text>}
 
-              <Pressable style={styles.termsRow} onPress={() => setAgree((a) => !a)}>
-                <View style={[styles.checkbox, agree ? styles.checkboxChecked : null]} />
-                <Text style={styles.termsText}>
-                  I agree to the{" "}
-                  <Text style={styles.footerLink} onPress={() => setTermsVisible(true)}>
-                    Terms and Conditions
+                <View style={styles.passwordWrap}>
+                  <TextInput
+                    value={pw}
+                    onChangeText={(v) => {
+                      if (!touched.pw) setTouched((t) => ({ ...t, pw: true }));
+                      setPw(v);
+                    }}
+                    placeholder="Password"
+                    placeholderTextColor="#8B97AD"
+                    secureTextEntry={!showPw}
+                    style={styles.passwordInput}
+                  />
+                  <Pressable onPress={() => setShowPw((s) => !s)} style={styles.eyeBtn}>
+                    <Ionicons name={showPw ? "eye-off" : "eye"} size={22} color="#8B97AD" />
+                  </Pressable>
+                </View>
+                {!!fieldErrors.pw && <Text style={styles.fieldError}>{fieldErrors.pw}</Text>}
+
+                <View style={styles.passwordWrap}>
+                  <TextInput
+                    value={pw2}
+                    onChangeText={(v) => {
+                      if (!touched.pw2) setTouched((t) => ({ ...t, pw2: true }));
+                      setPw2(v);
+                    }}
+                    placeholder="Confirm Password"
+                    placeholderTextColor="#8B97AD"
+                    secureTextEntry={!showPw2}
+                    style={styles.passwordInput}
+                  />
+                  <Pressable onPress={() => setShowPw2((s) => !s)} style={styles.eyeBtn}>
+                    <Ionicons name={showPw2 ? "eye-off" : "eye"} size={22} color="#8B97AD" />
+                  </Pressable>
+                </View>
+                {!!fieldErrors.pw2 && <Text style={styles.fieldError}>{fieldErrors.pw2}</Text>}
+
+                <Pressable style={styles.termsRow} onPress={() => setAgree((a) => !a)}>
+                  <View style={[styles.checkbox, agree ? styles.checkboxChecked : null]} />
+                  <Text style={styles.termsText}>
+                    I agree to the{" "}
+                    <Text style={styles.footerLink} onPress={() => setTermsVisible(true)}>
+                      Terms and Conditions
+                    </Text>
                   </Text>
-                </Text>
-              </Pressable>
-
-              <Pressable
-                style={[styles.signUpBtn, !canSubmit ? { opacity: 0.65 } : null]}
-                onPress={onSignUp}
-                disabled={!canSubmit}
-              >
-                <Text style={styles.signUpText}>{loading ? "Signing up..." : "Sign Up"}</Text>
-              </Pressable>
-
-              <View style={styles.footerRow}>
-                <Text style={styles.footerText}>Already have an account? </Text>
-                <Pressable onPress={() => navigation.replace("Login")}>
-                  <Text style={styles.footerLink}>Sign In</Text>
                 </Pressable>
-              </View>
-            </View>
 
-            <View style={{ height: 10 }} />
-          </ScrollView>
+                <Pressable
+                  style={[styles.signUpBtn, !canSubmit ? { opacity: 0.65 } : null]}
+                  onPress={onSignUp}
+                  disabled={!canSubmit}
+                >
+                  <Text style={styles.signUpText}>{loading ? "Signing up..." : "Sign Up"}</Text>
+                </Pressable>
+
+                <View style={styles.footerRow}>
+                  <Text style={styles.footerText}>Already have an account? </Text>
+                  <Pressable onPress={() => navigation.replace("Login")}>
+                    <Text style={styles.footerLink}>Sign In</Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              <View style={{ height: 10 }} />
+            </ScrollView>
+          </KeyboardAvoidingView>
         </View>
 
         <Modal
@@ -403,7 +418,6 @@ const styles = StyleSheet.create({
   bg: { flex: 1 },
   safe: { flex: 1 },
 
-  // ✅ EXACT same header styles as Login
   blueArea: {
     width: "100%",
     alignItems: "center",
@@ -417,7 +431,6 @@ const styles = StyleSheet.create({
   logo: { width: 112, height: 112 },
   brand: { fontSize: 40, fontWeight: "800", color: "white", marginTop: 4 },
 
-  // ✅ same card container style
   card: {
     position: "absolute",
     left: 0,
@@ -433,24 +446,20 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
 
-  // ✅ match Login white-card spacing
   cardContent: {
     paddingBottom: 20,
     alignItems: "center",
   },
 
-  // ✅ match Login form sizing
   form: {
     width: "88%",
     maxWidth: 440,
     marginTop: 16,
   },
 
-  // ✅ match Login typography
   title: { fontSize: 24, fontWeight: "900", textAlign: "center", color: "#0B1220" },
   subtitle: { marginTop: 8, textAlign: "center", color: "#5D6B86", fontSize: 13 },
 
-  // ✅ match Login input sizing
   input: {
     width: "100%",
     backgroundColor: "#F7FBFF",
@@ -478,7 +487,6 @@ const styles = StyleSheet.create({
   passwordInput: { flex: 1, paddingVertical: 14, color: "#0B1220", fontSize: 14 },
   eyeBtn: { paddingLeft: 10, paddingVertical: 8 },
 
-  // ✅ use same error style name as Login (fieldError)
   fieldError: {
     width: "100%",
     color: "#D23B3B",
@@ -487,7 +495,6 @@ const styles = StyleSheet.create({
     paddingLeft: 4,
   },
 
-  // Terms row fits with the new spacing
   termsRow: {
     width: "100%",
     flexDirection: "row",
@@ -500,7 +507,6 @@ const styles = StyleSheet.create({
   checkboxChecked: { backgroundColor: "#3D73E0", borderColor: "#3D73E0" },
   termsText: { color: "#6A7CA3", fontSize: 12 },
 
-  // ✅ match Login button sizing
   signUpBtn: {
     width: "100%",
     backgroundColor: "#3D73E0",
@@ -511,12 +517,10 @@ const styles = StyleSheet.create({
   },
   signUpText: { color: "white", fontWeight: "900", fontSize: 14 },
 
-  // ✅ match Login footer spacing/styles
   footerRow: { flexDirection: "row", justifyContent: "center", marginTop: 24 },
   footerText: { color: "#6A7CA3", fontSize: 12 },
   footerLink: { color: "#3D73E0", fontWeight: "800", fontSize: 12 },
 
-  // Modal unchanged
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.45)",

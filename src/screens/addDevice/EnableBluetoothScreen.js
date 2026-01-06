@@ -1,12 +1,11 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable, Image, ScrollView } from "react-native";
+import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function EnableBluetoothScreen({ navigation }) {
   const onEnable = () => {
-    // ✅ Simulation: proceed to scan
     navigation.navigate("ScanBluetooth");
   };
 
@@ -15,38 +14,36 @@ export default function EnableBluetoothScreen({ navigation }) {
       <LinearGradient colors={["#0B3A8D", "#061A33"]} style={styles.header}>
         <SafeAreaView edges={["top"]}>
           <View style={styles.headerRow}>
-            <View style={styles.brandRow}>
-              <Image source={require("../../../assets/logo.png")} style={styles.headerLogo} resizeMode="contain" />
-              <Text style={styles.headerBrand}>AquaVolt</Text>
-            </View>
+            <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={10}>
+              <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
+            </Pressable>
+
+            <Text style={styles.headerTitle}>Bluetooth</Text>
+
             <View style={{ width: 42 }} />
           </View>
         </SafeAreaView>
       </LinearGradient>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.card}>
           <View style={styles.bigIcon}>
             <Ionicons name="bluetooth" size={44} color="#FFFFFF" />
           </View>
 
           <Text style={styles.title}>Enable Bluetooth</Text>
-          <Text style={styles.sub}>
-            Turn on Bluetooth to connect to your AquaVolt device.
-          </Text>
+          <Text style={styles.sub}>Turn on Bluetooth to connect to your AquaVolt device.</Text>
 
           <View style={styles.tip}>
-            <Text style={styles.tipText}>
-              Make sure Bluetooth is enabled and your AquaVolt ESP32 is powered on.
-            </Text>
+            <Text style={styles.tipText}>Make sure Bluetooth is enabled and your AquaVolt ESP32 is powered on.</Text>
           </View>
 
           <Pressable style={styles.primaryBtn} onPress={onEnable}>
             <Text style={styles.primaryText}>Enable Bluetooth</Text>
-          </Pressable>
-
-          <Pressable style={styles.secondaryBtn} onPress={() => navigation.goBack()}>
-            <Text style={styles.secondaryText}>Back</Text>
           </Pressable>
         </View>
 
@@ -61,11 +58,16 @@ const styles = StyleSheet.create({
 
   header: { paddingHorizontal: 16, paddingBottom: 14 },
   headerRow: { height: 64, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  brandRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  headerLogo: { width: 38, height: 38 },
-  headerBrand: { color: "#fff", fontSize: 22, fontWeight: "900" },
+  backBtn: { width: 42, height: 42, alignItems: "center", justifyContent: "center", borderRadius: 999 },
+  headerTitle: { color: "#fff", fontSize: 18, fontWeight: "900" },
 
-  content: { paddingTop: 16, paddingBottom: 10, alignItems: "center" },
+  content: {
+    flexGrow: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingTop: 16,
+    paddingBottom: 10,
+  },
 
   card: {
     width: "86%",
@@ -112,17 +114,4 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   primaryText: { color: "#FFFFFF", fontSize: 13, fontWeight: "900" },
-
-  secondaryBtn: {
-    marginTop: 10,
-    width: "100%",
-    height: 46,
-    borderRadius: 12,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#D8E0EF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  secondaryText: { color: "#0B1220", fontSize: 13, fontWeight: "900" },
 });

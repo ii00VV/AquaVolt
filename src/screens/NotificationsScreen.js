@@ -5,7 +5,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 
 function formatRelative(ts) {
-  // quick simple formatter for mock data
   const now = Date.now();
   const diff = Math.max(0, now - ts);
 
@@ -46,7 +45,6 @@ function Section({ title, children }) {
 }
 
 export default function NotificationsScreen({ navigation }) {
-  // Mock data (later: replace with Firebase notifications collection)
   const items = useMemo(() => {
     const now = Date.now();
     return {
@@ -99,7 +97,6 @@ export default function NotificationsScreen({ navigation }) {
 
   return (
     <View style={styles.page}>
-      {/* Header */}
       <LinearGradient colors={["#0B3A8D", "#061A33"]} style={styles.header}>
         <SafeAreaView edges={["top"]}>
           <View style={styles.headerRow}>
@@ -113,8 +110,7 @@ export default function NotificationsScreen({ navigation }) {
           </View>
         </SafeAreaView>
       </LinearGradient>
-
-      {/* Content */}
+      
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Notifications</Text>
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, Pressable, TextInput, Alert, Image, ScrollView } from "react-native";
+import { View, Text, StyleSheet, Pressable, TextInput, Alert, Image, ScrollView, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,11 +7,10 @@ import { ref, get, update } from "firebase/database";
 
 import { auth, db } from "../services/firebase";
 
-// ✅ same formatter style as SignUpScreen
 function formatFullName(value) {
   const clean = String(value || "")
     .trim()
-    .replace(/\s+/g, " "); // collapse multiple spaces
+    .replace(/\s+/g, " ");
 
   if (!clean) return "";
 
@@ -25,6 +24,8 @@ export default function EditNameScreen({ navigation }) {
   const [value, setValue] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const [successVisible, setSuccessVisible] = useState(false);
+
   useEffect(() => {
     (async () => {
       const uid = auth.currentUser?.uid;
@@ -35,21 +36,29 @@ export default function EditNameScreen({ navigation }) {
     })();
   }, []);
 
+  const closeSuccess = () => {
+    setSuccessVisible(false);
+    navigation.navigate({
+      name: "EditProfile",
+      params: { updated: "name" },
+      merge: true,
+    });
+  };
+
   const onSave = async () => {
     const uid = auth.currentUser?.uid;
     if (!uid) return Alert.alert("Not logged in", "Please login again.");
 
     const formatted = formatFullName(value);
-
     if (formatted.length < 2) return Alert.alert("Invalid name", "Please enter your full name.");
 
     try {
       setSaving(true);
       await update(ref(db, `users/${uid}`), { fullName: formatted });
 
-      // ✅ also update local input so user immediately sees formatted version
       setValue(formatted);
-      navigation.goBack();
+
+      setSuccessVisible(true);
     } catch (e) {
       Alert.alert("Save failed", e?.message || "Please try again.");
     } finally {
@@ -82,7 +91,7 @@ export default function EditNameScreen({ navigation }) {
           <TextInput
             value={value}
             onChangeText={setValue}
-            onBlur={() => setValue((v) => formatFullName(v))} // ✅ auto-format like signup
+            onBlur={() => setValue((v) => formatFullName(v))}
             placeholder="Enter your full name"
             style={styles.input}
             autoCapitalize="words"
@@ -95,6 +104,21 @@ export default function EditNameScreen({ navigation }) {
 
         <View style={{ height: 28 }} />
       </ScrollView>
+
+      <Modal visible={successVisible} animationType="fade" transparent onRequestClose={() => setSuccessVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Name Updated</Text>
+            <Text style={styles.modalSub}>Your full name has been updated successfully.</Text>
+
+            <View style={styles.modalActions}>
+              <Pressable style={[styles.modalBtn, styles.modalBtnPrimary]} onPress={closeSuccess}>
+                <Text style={styles.modalBtnPrimaryText}>OK</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -154,4 +178,40 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   saveText: { color: "#FFFFFF", fontSize: 13, fontWeight: "900" },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 18,
+  },
+  modalCard: {
+    width: "92%",       
+    maxWidth: 420,      
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 20,       
+    borderWidth: 1,
+    borderColor: "#D8E0EF",
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#0B1220",
+    textAlign: "center",
+  },
+  modalSub: {
+    marginTop: 8,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#6B7A99",
+    textAlign: "center",
+    lineHeight: 16,
+  },
+  modalActions: { flexDirection: "row", gap: 10, marginTop: 14 },
+  modalBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: "center" },
+  modalBtnPrimary: { backgroundColor: "#2F5FE8" },
+  modalBtnPrimaryText: { color: "#FFFFFF", fontWeight: "900", fontSize: 12 },
 });

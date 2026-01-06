@@ -20,14 +20,44 @@ function FlowHeader({ title, onBack }) {
   );
 }
 
+function DeviceItem({ scanning, device, onPick }) {
+  return (
+    <Pressable
+      onPress={() => onPick(device)}
+      style={[styles.deviceItem, scanning ? { opacity: 0.65 } : null]}
+      disabled={scanning}
+    >
+      <View style={styles.deviceLeft}>
+        <View style={styles.wifiIconBox}>
+          <Ionicons name="wifi" size={18} color="#0B3A8D" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.deviceName}>{device.id}</Text>
+          <Text style={styles.deviceSub}>{device.name}</Text>
+        </View>
+      </View>
+
+      <View style={styles.deviceRight}>
+        <View style={[styles.badge, { backgroundColor: scanning ? "#E5E7EB" : "#DCFCE7" }]}>
+          <Text style={[styles.badgeText, { color: scanning ? "#6B7280" : "#166534" }]}>
+            {scanning ? "..." : "Available"}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color="#8B97AD" />
+      </View>
+    </Pressable>
+  );
+}
+
 export default function ScanDevicesScreen({ navigation }) {
   const [scanning, setScanning] = useState(true);
 
-  const foundDevice = useMemo(
-    () => ({
-      id: "ESP32-AV-8F3D",
-      name: "AquaVolt Device",
-    }),
+  const devices = useMemo(
+    () => [
+      { id: "ESP32-AV-8F3D", name: "AquaVolt Device" },
+      { id: "ESP32-AV-2C91", name: "AquaVolt Device" },
+      { id: "ESP32-AV-77A0", name: "AquaVolt Device" },
+    ],
     []
   );
 
@@ -36,8 +66,8 @@ export default function ScanDevicesScreen({ navigation }) {
     return () => clearTimeout(t);
   }, []);
 
-  const onPick = () => {
-    navigation.navigate("WifiCredentials", { device: foundDevice });
+  const onPick = (device) => {
+    navigation.navigate("WifiCredentials", { device });
   };
 
   return (
@@ -50,35 +80,20 @@ export default function ScanDevicesScreen({ navigation }) {
 
         <View style={styles.listCard}>
           <View style={styles.scanRow}>
-            <Ionicons name={scanning ? "sync" : "checkmark-circle"} size={18} color={scanning ? "#2F5FE8" : "#22C55E"} />
-            <Text style={styles.scanText}>{scanning ? "Scanning..." : "1 device found"}</Text>
+            <Ionicons
+              name={scanning ? "sync" : "checkmark-circle"}
+              size={18}
+              color={scanning ? "#2F5FE8" : "#22C55E"}
+            />
+            <Text style={styles.scanText}>{scanning ? "Scanning..." : `${devices.length} devices found`}</Text>
           </View>
 
-          <Pressable onPress={onPick} style={styles.deviceItem} disabled={scanning}>
-            <View style={styles.deviceLeft}>
-              <View style={styles.wifiIconBox}>
-                <Ionicons name="wifi" size={18} color="#0B3A8D" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.deviceName}>{foundDevice.id}</Text>
-                <Text style={styles.deviceSub}>{foundDevice.name}</Text>
-              </View>
+          {devices.map((d, idx) => (
+            <View key={d.id} style={idx === 0 ? null : { marginTop: 10 }}>
+              <DeviceItem scanning={scanning} device={d} onPick={onPick} />
             </View>
-
-            <View style={styles.deviceRight}>
-              <View style={[styles.badge, { backgroundColor: scanning ? "#E5E7EB" : "#DCFCE7" }]}>
-                <Text style={[styles.badgeText, { color: scanning ? "#6B7280" : "#166534" }]}>
-                  {scanning ? "..." : "Available"}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#8B97AD" />
-            </View>
-          </Pressable>
+          ))}
         </View>
-
-        <Pressable onPress={() => navigation.goBack()} style={styles.bottomBtn}>
-          <Text style={styles.bottomBtnText}>Back</Text>
-        </Pressable>
       </ScrollView>
     </View>
   );

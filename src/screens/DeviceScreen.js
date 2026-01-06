@@ -1,6 +1,14 @@
-// src/screens/DeviceScreen.js
 import React, { useMemo, useEffect, useState, useCallback } from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView, Alert, Image, Modal, ActivityIndicator } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  Image,
+  Modal,
+  ActivityIndicator,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -69,9 +77,11 @@ export default function DeviceScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [device, setDevice] = useState(null);
 
-  // ✅ Restart simulation modal state
   const [restartVisible, setRestartVisible] = useState(false);
-  const [restartStep, setRestartStep] = useState("restarting"); // "restarting" | "done"
+  const [restartStep, setRestartStep] = useState("restarting");
+
+  const [removeVisible, setRemoveVisible] = useState(false);
+  const [removing, setRemoving] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -93,35 +103,30 @@ export default function DeviceScreen({ navigation }) {
     nav.navigate("AddDeviceFlow", { mode: mode || "wifi" });
   };
 
-  // ✅ Restart device -> show popup simulation
   const onRestartDevice = () => {
     setRestartStep("restarting");
     setRestartVisible(true);
 
-    // Simulate restart process
     setTimeout(() => {
       setRestartStep("done");
-
-      // Auto close after showing success
-      setTimeout(() => {
-        setRestartVisible(false);
-      }, 900);
+      setTimeout(() => setRestartVisible(false), 900);
     }, 1800);
   };
 
-  const onRemoveDevice = () => {
-    Alert.alert("Remove Device", "Remove this device from your account?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Remove",
-        style: "destructive",
-        onPress: async () => {
-          const uid = auth.currentUser?.uid;
-          await clearDevice(uid);
-          await refresh();
-        },
-      },
-    ]);
+  const onRemoveDevice = () => setRemoveVisible(true);
+
+  const confirmRemove = async () => {
+    if (removing) return;
+    setRemoving(true);
+
+    try {
+      const uid = auth.currentUser?.uid;
+      await clearDevice(uid);
+      await refresh();
+      setRemoveVisible(false);
+    } finally {
+      setRemoving(false);
+    }
   };
 
   const onSwitchConnection = () => {
@@ -149,11 +154,7 @@ export default function DeviceScreen({ navigation }) {
         <SafeAreaView edges={["top"]}>
           <View style={styles.headerRow}>
             <View style={styles.brandRow}>
-              <Image
-                source={require("../../assets/logo.png")}
-                style={styles.headerLogo}
-                resizeMode="contain"
-              />
+              <Image source={require("../../assets/logo.png")} style={styles.headerLogo} resizeMode="contain" />
               <Text style={styles.headerBrand}>AquaVolt</Text>
             </View>
             <View style={{ width: 42 }} />
@@ -178,7 +179,6 @@ export default function DeviceScreen({ navigation }) {
 
         {!loading && !!device && (
           <>
-            {/* Device card */}
             <View style={styles.card}>
               <View style={styles.cardTopRow}>
                 <Text style={styles.cardTopTitle}>{deviceName}</Text>
@@ -195,7 +195,6 @@ export default function DeviceScreen({ navigation }) {
               </View>
             </View>
 
-            {/* Connection card */}
             <View style={styles.card}>
               <Text style={styles.sectionTitle}>Connection Type</Text>
 
@@ -206,9 +205,7 @@ export default function DeviceScreen({ navigation }) {
 
                 <View style={{ flex: 1 }}>
                   <Text style={styles.connTitle}>{isBt ? "Bluetooth (Offline Mode)" : "WiFi (Cloud Mode)"}</Text>
-                  <Text style={styles.connSub}>
-                    {isBt ? "Local connection active" : "Remote monitoring enabled"}
-                  </Text>
+                  <Text style={styles.connSub}>{isBt ? "Local connection active" : "Remote monitoring enabled"}</Text>
                 </View>
 
                 <View style={styles.greenDotSmall} />
@@ -233,11 +230,8 @@ export default function DeviceScreen({ navigation }) {
               </Pressable>
             </View>
 
-            {/* Quick Actions */}
             <View style={styles.card}>
               <Text style={styles.sectionTitle}>Quick Actions</Text>
-
-              {/* ✅ Reconfigure WiFi removed */}
 
               <Pressable style={[styles.actionBtn, styles.actionWhite]} onPress={onRestartDevice}>
                 <Ionicons name="refresh" size={18} color="#0B1220" />
@@ -255,7 +249,6 @@ export default function DeviceScreen({ navigation }) {
         <View style={{ height: 28 }} />
       </ScrollView>
 
-      {/* ✅ Restart popup simulation */}
       <Modal visible={restartVisible} transparent animationType="fade" onRequestClose={() => setRestartVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
@@ -274,6 +267,43 @@ export default function DeviceScreen({ navigation }) {
                 <Text style={styles.modalSub}>Reconnected successfully</Text>
               </>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={removeVisible} transparent animationType="fade" onRequestClose={() => !removing && setRemoveVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.warnCircle}>
+              <Ionicons name="trash" size={26} color="#FFFFFF" />
+            </View>
+
+            <Text style={styles.modalTitle}>Remove this device?</Text>
+            <Text style={styles.modalSub}>
+              This will disconnect the device from your account. You can add it again later.
+            </Text>
+
+            <View style={styles.modalActions}>
+              <Pressable
+                style={[styles.modalBtn, styles.modalBtnGhost]}
+                onPress={() => setRemoveVisible(false)}
+                disabled={removing}
+              >
+                <Text style={styles.modalBtnGhostText}>Cancel</Text>
+              </Pressable>
+
+              <Pressable
+                style={[styles.modalBtn, styles.modalBtnDanger]}
+                onPress={confirmRemove}
+                disabled={removing}
+              >
+                {removing ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalBtnDangerText}>Remove</Text>
+                )}
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
@@ -428,14 +458,34 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  modalBtn: {
+
+  warnCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 56,
+    backgroundColor: "#E25555",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalActions: {
     marginTop: 14,
-    backgroundColor: "#2F5FE8",
-    height: 42,
+    width: "100%",
+    flexDirection: "row",
+    gap: 10,
+  },
+  modalBtn: {
+    flex: 1,
+    height: 44,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 22,
   },
-  modalBtnText: { color: "#fff", fontWeight: "900", fontSize: 12 },
+  modalBtnGhost: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#D8E0EF",
+  },
+  modalBtnGhostText: { color: "#0B1220", fontWeight: "900", fontSize: 12 },
+  modalBtnDanger: { backgroundColor: "#E25555" },
+  modalBtnDangerText: { color: "#FFFFFF", fontWeight: "900", fontSize: 12 },
 });
