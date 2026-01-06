@@ -152,7 +152,7 @@ export default function ProfileScreen({ navigation }) {
       } else if (e?.code === "auth/user-mismatch" || e?.code === "auth/user-not-found") {
         setConfirmError("Session error. Please login again.");
       } else {
-        setConfirmError("Could not confirm password. Please try again.");
+        setConfirmError("Incorrect password. Please try again.");
       }
     } finally {
       setConfirming(false);

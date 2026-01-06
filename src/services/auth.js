@@ -59,6 +59,7 @@ export async function signUpWithEmail({ fullName, email, password }) {
     email: emailLower,
     emailLower,
     emailVerified: false,
+    disabled: false,
     createdAt: Date.now(),
     provider: "password",
   });
@@ -71,21 +72,32 @@ export async function signUpWithEmail({ fullName, email, password }) {
 export async function loginWithEmail({ email, password }) {
   const a = requireAuth();
 
-  const cred = await signInWithEmailAndPassword(
-    a,
-    email.trim().toLowerCase(),
-    password
-  );
+  const cred = await signInWithEmailAndPassword(a, email.trim().toLowerCase(), password);
   await reload(cred.user);
 
+  const uid = cred.user.uid;
+  let disabled = false;
+  try {
+    const snap = await get(ref(db, `users/${uid}/disabled`));
+    disabled = snap.exists() ? !!snap.val() : false;
+  } catch {
+    disabled = false;
+  }
+
   if (!cred.user.emailVerified) {
+    if (disabled === true) {
+      const err = new Error("ACCOUNT_DISABLED");
+      err.code = "ACCOUNT_DISABLED";
+      throw err;
+    }
+
     await signOut(a);
     const err = new Error("EMAIL_NOT_VERIFIED");
     err.code = "EMAIL_NOT_VERIFIED";
     throw err;
   }
 
-  await update(ref(db, `users/${cred.user.uid}`), {
+  await update(ref(db, `users/${uid}`), {
     lastLoginAt: Date.now(),
   });
 
@@ -126,6 +138,7 @@ export async function loginWithGoogleTokens({ idToken, accessToken }) {
         email: emailLower,
         emailLower,
         emailVerified: true,
+        disabled: false,
         createdAt: Date.now(),
         lastLoginAt: Date.now(),
         provider: "google",

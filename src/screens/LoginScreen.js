@@ -9,11 +9,17 @@ import {
   ScrollView,
   SafeAreaView,
   useWindowDimensions,
+  Modal,
+  ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { loginWithEmail, loginWithGoogleTokens } from "../services/auth";
+import { loginWithEmail, loginWithGoogleTokens, logout } from "../services/auth";
+
+import { auth, db } from "../services/firebase";
+import { ref, get, update, serverTimestamp } from "firebase/database";
+import { reload, sendEmailVerification } from "firebase/auth";
 
 import * as AuthSession from "expo-auth-session";
 import * as Google from "expo-auth-session/providers/google";
@@ -28,17 +34,56 @@ const IOS_CLIENT_ID =
   "94977781048-2bo7fevnefuj4li0n5eqde7hgn0ekaid.apps.googleusercontent.com";
 const ANDROID_CLIENT_ID =
   "94977781048-8lb9sbv7f3qegi3oshv28m1blhffhubn.apps.googleusercontent.com";
-CTLY
-const PROJECT_NAME_FOR_PROXY = "@llowww/aquavolt";
 
+const PROJECT_NAME_FOR_PROXY = "@llowww/aquavolt";
 const EXPO_PROXY_REDIRECT_URI = `https://auth.expo.io/${PROJECT_NAME_FOR_PROXY}`;
 
 function randomNonce(len = 32) {
-  const chars =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let out = "";
   for (let i = 0; i < len; i++) out += chars[Math.floor(Math.random() * chars.length)];
   return out;
+}
+
+async function getDisabledFlag(uid) {
+  const snap = await get(ref(db, `users/${uid}/disabled`));
+  if (!snap.exists()) return false;
+  return !!snap.val();
+}
+
+async function syncPendingEmailIfNeeded(user) {
+  if (!user?.uid) return;
+
+  try {
+    await user.getIdToken(true);
+  } catch {}
+  try {
+    await reload(user);
+  } catch {}
+
+  const uid = user.uid;
+  const authEmailLower = (user.email || "").trim().toLowerCase();
+  if (!authEmailLower) return;
+
+  const snap = await get(ref(db, `users/${uid}`));
+  if (!snap.exists()) return;
+
+  const node = snap.val() || {};
+  const pendingLower = String(node.pendingEmailLower || node.pendingEmail || "")
+    .trim()
+    .toLowerCase();
+
+  if (pendingLower && pendingLower === authEmailLower) {
+    await update(ref(db, `users/${uid}`), {
+      email: authEmailLower,
+      emailLower: authEmailLower,
+      emailVerified: true,
+      verifiedAt: serverTimestamp(),
+      pendingEmail: null,
+      pendingEmailLower: null,
+      emailChangedAt: serverTimestamp(),
+    });
+  }
 }
 
 export default function LoginScreen({ navigation }) {
@@ -50,6 +95,10 @@ export default function LoginScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [pwError, setPwError] = useState("");
+
+  const [disabledVisible, setDisabledVisible] = useState(false);
+  const [disabledMsg, setDisabledMsg] = useState("");
+  const [disabledBusy, setDisabledBusy] = useState(false);
 
   const [headerH, setHeaderH] = useState(170);
 
@@ -67,7 +116,6 @@ export default function LoginScreen({ navigation }) {
   const isValidEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
   const isExpoGo = Constants.appOwnership === "expo";
-
   const nonce = useMemo(() => randomNonce(32), []);
 
   const googleConfig = useMemo(() => {
@@ -80,10 +128,7 @@ export default function LoginScreen({ navigation }) {
         redirectUri: EXPO_PROXY_REDIRECT_URI,
         usePKCE: false,
         responseType: AuthSession.ResponseType.IdToken,
-        extraParams: {
-          nonce,
-          prompt: "select_account",
-        },
+        extraParams: { nonce, prompt: "select_account" },
       };
     }
 
@@ -95,20 +140,41 @@ export default function LoginScreen({ navigation }) {
       redirectUri: nativeRedirectUri,
       usePKCE: true,
       responseType: AuthSession.ResponseType.Code,
-      extraParams: {
-        prompt: "select_account",
-      },
+      extraParams: { prompt: "select_account" },
     };
   }, [isExpoGo, nonce]);
 
   const [request, response, promptAsync] = Google.useAuthRequest(googleConfig);
 
-  useEffect(() => {
-    console.log("isExpoGo:", isExpoGo);
-    console.log("projectNameForProxy:", PROJECT_NAME_FOR_PROXY);
-    console.log("redirectUri USED:", isExpoGo ? EXPO_PROXY_REDIRECT_URI : "(native)");
-    if (request?.url) console.log("GOOGLE AUTH URL:", request.url);
-  }, [isExpoGo, request?.url]);
+  const checkDisabledAndRoute = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      navigation.replace("Login");
+      return;
+    }
+
+    try {
+      await reload(user);
+    } catch {}
+
+    const uid = user.uid;
+
+    let disabled = false;
+    try {
+      disabled = await getDisabledFlag(uid);
+    } catch {
+      navigation.replace("MainTabs");
+      return;
+    }
+
+    if (!disabled) {
+      navigation.replace("MainTabs");
+      return;
+    }
+
+    setDisabledMsg("");
+    setDisabledVisible(true);
+  };
 
   useEffect(() => {
     if (!response) return;
@@ -126,8 +192,13 @@ export default function LoginScreen({ navigation }) {
             return;
           }
 
-          await loginWithGoogleTokens({ idToken, accessToken: null });
-          navigation.replace("MainTabs");
+          const u = await loginWithGoogleTokens({ idToken, accessToken: null });
+
+          try {
+            await syncPendingEmailIfNeeded(auth.currentUser || u);
+          } catch {}
+
+          await checkDisabledAndRoute();
         } catch (e) {
           console.log("Google SSO error:", e);
           setPwError(e?.message || "Google login failed. Please try again.");
@@ -167,8 +238,13 @@ export default function LoginScreen({ navigation }) {
     }
 
     try {
-      await loginWithEmail({ email: emailTrim, password });
-      navigation.replace("MainTabs");
+      const u = await loginWithEmail({ email: emailTrim, password });
+
+      try {
+        await syncPendingEmailIfNeeded(auth.currentUser || u);
+      } catch {}
+
+      await checkDisabledAndRoute();
     } catch (e) {
       if (e?.code === "EMAIL_NOT_VERIFIED" || e?.message === "EMAIL_NOT_VERIFIED") {
         setPwError("Please verify your email first.");
@@ -189,7 +265,6 @@ export default function LoginScreen({ navigation }) {
   const onGoogleSSO = async () => {
     try {
       setPwError("");
-
       await promptAsync({
         useProxy: isExpoGo,
         projectNameForProxy: isExpoGo ? PROJECT_NAME_FOR_PROXY : undefined,
@@ -198,6 +273,59 @@ export default function LoginScreen({ navigation }) {
     } catch (e) {
       console.log("promptAsync error:", e);
       setPwError("Google login cancelled/failed.");
+    }
+  };
+
+  const onDisabledLogout = async () => {
+    if (disabledBusy) return;
+    setDisabledBusy(true);
+    try {
+      await logout();
+    } catch {}
+    setDisabledVisible(false);
+    setDisabledMsg("");
+    setDisabledBusy(false);
+  };
+
+  const onReactivate = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      setDisabledMsg("No active session. Please log in again.");
+      return;
+    }
+    if (disabledBusy) return;
+
+    setDisabledBusy(true);
+    setDisabledMsg("");
+
+    try {
+      try {
+        await reload(user);
+      } catch {}
+
+      await sendEmailVerification(user);
+
+      await update(ref(db, `users/${user.uid}`), {
+        reactivationPending: true,
+        reactivationEmailSentAt: serverTimestamp(),
+      });
+
+      setDisabledVisible(false);
+      setDisabledMsg("");
+
+      navigation.replace("VerifyEmail", { mode: "reactivation" });
+    } catch (e) {
+      const code = e?.code || "";
+      const friendly =
+        code === "auth/too-many-requests"
+          ? "Too many requests. Please wait and try again."
+          : code === "auth/network-request-failed"
+          ? "Network error. Check your connection and try again."
+          : "Could not send verification email. Please try again.";
+
+      setDisabledMsg(friendly);
+    } finally {
+      setDisabledBusy(false);
     }
   };
 
@@ -233,9 +361,9 @@ export default function LoginScreen({ navigation }) {
                   if (pwError) setPwError("");
                 }}
                 onBlur={() => {
-                  const emailTrim = email.trim().toLowerCase();
-                  if (!emailTrim) setEmailError("Email is required.");
-                  else if (!isValidEmail(emailTrim)) setEmailError("Enter a valid email address.");
+                  const emailTrim2 = email.trim().toLowerCase();
+                  if (!emailTrim2) setEmailError("Email is required.");
+                  else if (!isValidEmail(emailTrim2)) setEmailError("Enter a valid email address.");
                   else setEmailError("");
                 }}
                 placeholder="Email Address"
@@ -286,6 +414,7 @@ export default function LoginScreen({ navigation }) {
                   </Text>
                 </Pressable>
               )}
+
               <View style={styles.ssoBlock}>
                 <View style={styles.dividerRow}>
                   <View style={styles.dividerLine} />
@@ -307,6 +436,52 @@ export default function LoginScreen({ navigation }) {
             <View style={{ height: 10 }} />
           </ScrollView>
         </View>
+
+        <Modal visible={disabledVisible} animationType="fade" transparent onRequestClose={() => {}}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Account Disabled</Text>
+              <Text style={styles.modalSub}>
+                Your account is currently disabled. Would you like to reactivate it?
+              </Text>
+
+              {!!disabledMsg && <Text style={styles.modalInfo}>{disabledMsg}</Text>}
+
+              <View style={styles.modalActions}>
+                <Pressable
+                  style={[styles.modalBtn, styles.modalBtnSecondary]}
+                  onPress={onDisabledLogout}
+                  disabled={disabledBusy}
+                >
+                  <Text style={styles.modalBtnSecondaryText}>Cancel</Text>
+                </Pressable>
+
+                <Pressable
+                  style={[
+                    styles.modalBtn,
+                    styles.modalBtnPrimary,
+                    disabledBusy ? { opacity: 0.75 } : null,
+                  ]}
+                  onPress={onReactivate}
+                  disabled={disabledBusy}
+                >
+                  {disabledBusy ? (
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                      <Text style={styles.modalBtnPrimaryText}>Working...</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.modalBtnPrimaryText}>Reactivate Account</Text>
+                  )}
+                </Pressable>
+              </View>
+
+              <Text style={styles.modalHint}>
+                A verification email will be sent. Open the link to reactivate your account.
+              </Text>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -316,18 +491,8 @@ const styles = StyleSheet.create({
   bg: { flex: 1 },
   safe: { flex: 1 },
 
-  blueArea: {
-    width: "100%",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  header: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingBottom: 8,
-  },
-
+  blueArea: { width: "100%", alignItems: "center", justifyContent: "center" },
+  header: { alignItems: "center", justifyContent: "center", paddingBottom: 8 },
   logo: { width: 112, height: 112 },
   brand: { fontSize: 40, fontWeight: "800", color: "white", marginTop: 4 },
 
@@ -345,17 +510,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: -2 },
     elevation: 8,
   },
+  cardContent: { paddingBottom: 20, alignItems: "center" },
 
-  cardContent: {
-    paddingBottom: 20,
-    alignItems: "center",
-  },
-
-  form: {
-    width: "88%",
-    maxWidth: 440,
-    marginTop: 16,
-  },
+  form: { width: "88%", maxWidth: 440, marginTop: 16 },
 
   title: { fontSize: 24, fontWeight: "900", textAlign: "center", color: "#0B1220" },
   subtitle: { marginTop: 8, textAlign: "center", color: "#5D6B86", fontSize: 13 },
@@ -387,13 +544,7 @@ const styles = StyleSheet.create({
   passwordInput: { flex: 1, paddingVertical: 14, color: "#0B1220", fontSize: 14 },
   eyeBtn: { paddingLeft: 10, paddingVertical: 8 },
 
-  fieldError: {
-    width: "100%",
-    color: "#D23B3B",
-    fontSize: 11,
-    marginTop: 6,
-    paddingLeft: 4,
-  },
+  fieldError: { width: "100%", color: "#D23B3B", fontSize: 11, marginTop: 6, paddingLeft: 4 },
 
   loginBtn: {
     width: "100%",
@@ -431,4 +582,50 @@ const styles = StyleSheet.create({
   },
   ssoText: { color: "#000", fontWeight: "900", fontSize: 14 },
   googleIcon: { width: 18, height: 18 },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    padding: 18,
+  },
+  modalCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#D8E0EF",
+  },
+  modalTitle: { fontSize: 16, fontWeight: "900", color: "#0B1220", textAlign: "center" },
+  modalSub: {
+    marginTop: 8,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#6B7A99",
+    textAlign: "center",
+    lineHeight: 16,
+  },
+  modalInfo: {
+    marginTop: 10,
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#2F5FE8",
+    textAlign: "center",
+    lineHeight: 16,
+  },
+  modalActions: { flexDirection: "row", gap: 10, marginTop: 14 },
+  modalBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: "center" },
+  modalBtnSecondary: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D8E0EF" },
+  modalBtnSecondaryText: { color: "#6B7A99", fontWeight: "900", fontSize: 12 },
+  modalBtnPrimary: { backgroundColor: "#2F5FE8" },
+  modalBtnPrimaryText: { color: "#FFFFFF", fontWeight: "900", fontSize: 12 },
+
+  modalHint: {
+    marginTop: 12,
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#7C8AA6",
+    textAlign: "center",
+    lineHeight: 15,
+  },
 });

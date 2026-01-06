@@ -7,18 +7,11 @@ import { logout } from "../services/auth";
 import { ref, get, update, serverTimestamp } from "firebase/database";
 import { reload, sendEmailVerification, verifyBeforeUpdateEmail } from "firebase/auth";
 
-async function fetchPendingEmail(uid) {
+async function fetchUserNode(uid) {
   if (!uid) return null;
   try {
     const snap = await get(ref(db, `users/${uid}`));
-    if (!snap.exists()) return null;
-
-    const node = snap.val() || {};
-    return {
-      pendingEmail: node.pendingEmail || null,
-      pendingEmailLower: node.pendingEmailLower || null,
-      dbEmail: node.email || null,
-    };
+    return snap.exists() ? snap.val() : null;
   } catch {
     return null;
   }
@@ -39,38 +32,108 @@ async function reloadWithRetry(user) {
   }
 }
 
-export default function VerifyEmailScreen({ navigation }) {
+export default function VerifyEmailScreen({ navigation, route }) {
+  const mode = route?.params?.mode || "signup";
+
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
+  const setMessage = (t) => setMsg(String(t || ""));
+
+  const title = mode === "reactivation" ? "Reactivate Your Account" : "Verify Your Email";
+
   const onOk = async () => {
-    setMsg("");
+    setMessage("");
     setLoading(true);
 
     try {
       const user = auth.currentUser;
       if (!user) {
-        setMsg("No active user. Please sign up or log in again.");
+        setMessage("No active user. Please log in again.");
         navigation.replace("Login");
         return;
       }
 
+      try {
+        await user.getIdToken(true);
+      } catch {}
       await reloadWithRetry(user);
 
       const uid = user.uid;
-      const authEmail = (user.email || "").trim().toLowerCase();
+      const authEmailLower = (user.email || "").trim().toLowerCase();
 
-      const pending = await fetchPendingEmail(uid);
+      const node = await fetchUserNode(uid);
+
+      const pendingEmailLower = String(node?.pendingEmailLower || "")
+        .trim()
+        .toLowerCase();
+
+      const isEmailChangeFlow = !!pendingEmailLower;
+      const isReactivation = mode === "reactivation";
+
+      if (isEmailChangeFlow) {
+        if (!authEmailLower) {
+          setMessage("Could not read your current email. Please try again.");
+          return;
+        }
+
+        if (authEmailLower !== pendingEmailLower) {
+          setMessage(`Still waiting. Please open the link sent to: ${pendingEmailLower}`);
+          return;
+        }
+
+        try {
+          await update(ref(db, `users/${uid}`), {
+            email: authEmailLower,
+            emailLower: authEmailLower,
+            emailVerified: true,
+            verifiedAt: serverTimestamp(),
+            pendingEmail: null,
+            pendingEmailLower: null,
+            emailChangedAt: serverTimestamp(),
+          });
+        } catch (dbErr) {
+          setMessage(dbErr?.message || "Could not update database. Try again.");
+          return;
+        }
+
+        await logout();
+        navigation.replace("Login");
+        return;
+      }
+
+      if (isReactivation) {
+        if (!user.emailVerified) {
+          setMessage("Not verified yet. Open the reactivation email link, then tap OK again.");
+          return;
+        }
+
+        try {
+          await update(ref(db, `users/${uid}`), {
+            email: authEmailLower || node?.email || null,
+            emailLower: authEmailLower || node?.emailLower || null,
+            emailVerified: true,
+            verifiedAt: serverTimestamp(),
+            disabled: false,
+            reactivationPending: false,
+            reactivatedAt: serverTimestamp(),
+          });
+        } catch (dbErr) {
+          setMessage(dbErr?.message || "Could not reactivate account in database. Try again.");
+          return;
+        }
+
+        await logout();
+        navigation.replace("Login");
+        return;
+      }
 
       if (user.emailVerified) {
         await update(ref(db, `users/${uid}`), {
-          email: authEmail || pending?.pendingEmail || pending?.dbEmail || null,
-          emailLower: authEmail || pending?.pendingEmailLower || null,
+          email: authEmailLower || node?.email || null,
+          emailLower: authEmailLower || node?.emailLower || null,
           emailVerified: true,
           verifiedAt: serverTimestamp(),
-
-          pendingEmail: null,
-          pendingEmailLower: null,
         });
 
         await logout();
@@ -78,14 +141,17 @@ export default function VerifyEmailScreen({ navigation }) {
         return;
       }
 
-      setMsg("Not verified yet. Check inbox/spam then tap OK again.");
+      setMessage("Not verified yet. Check inbox/spam then tap OK again.");
     } catch (e) {
       const code = e?.code || "";
       const friendly =
         code === "auth/user-token-expired"
-          ? "Please re-log in again."
+          ? "Session expired. Please log in again."
           : code === "auth/network-request-failed"
-      setMsg(friendly);
+          ? "Network error. Check connection and try again."
+          : e?.message || "Could not verify status. Please try again.";
+
+      setMessage(friendly);
 
       if (code === "auth/user-token-expired") {
         try {
@@ -99,35 +165,52 @@ export default function VerifyEmailScreen({ navigation }) {
   };
 
   const onResend = async () => {
-    setMsg("");
+    setMessage("");
     setLoading(true);
 
     try {
       const user = auth.currentUser;
       if (!user) {
-        setMsg("No active user. Please log in again.");
+        setMessage("No active user. Please log in again.");
         navigation.replace("Login");
         return;
       }
 
+      try {
+        await user.getIdToken(true);
+      } catch {}
       await reloadWithRetry(user);
 
-      if (user.emailVerified) {
-        setMsg("Your email is already verified. Tap OK.");
+      const uid = user.uid;
+      const node = await fetchUserNode(uid);
+
+      const pendingEmail = node?.pendingEmail || null;
+
+      if (pendingEmail) {
+        await verifyBeforeUpdateEmail(user, pendingEmail);
+        setMessage(`Verification email resent to: ${pendingEmail}. Check inbox/spam.`);
         return;
       }
 
-      const uid = user.uid;
-      const pending = await fetchPendingEmail(uid);
+      if ((route?.params?.mode || "signup") === "reactivation") {
+        await sendEmailVerification(user);
 
-      if (pending?.pendingEmail) {
-        await verifyBeforeUpdateEmail(user, pending.pendingEmail);
-        setMsg("Verification email resent to your NEW email. Check inbox/spam.");
+        await update(ref(db, `users/${uid}`), {
+          reactivationPending: true,
+          reactivationEmailSentAt: serverTimestamp(),
+        });
+
+        setMessage("Reactivation email resent. Please check your inbox/spam.");
+        return;
+      }
+
+      if (user.emailVerified) {
+        setMessage("Your email is already verified. Tap OK.");
         return;
       }
 
       await sendEmailVerification(user);
-      setMsg("Verification email resent. Please check your inbox/spam.");
+      setMessage("Verification email resent. Please check your inbox/spam.");
     } catch (e) {
       const code = e?.code || "";
       const friendly =
@@ -135,16 +218,23 @@ export default function VerifyEmailScreen({ navigation }) {
           ? "For security, please re-login then try again."
           : code === "auth/network-request-failed"
           ? "Network error. Check connection and try again."
-          : "Could not resend. Try again.";
+          : e?.message || "Could not resend. Try again.";
 
-      setMsg(friendly);
+      setMessage(friendly);
 
       if (code === "auth/requires-recent-login") {
+        try {
+          await logout();
+        } catch {}
+        navigation.replace("Login");
       }
     } finally {
       setLoading(false);
     }
   };
+
+  const isInfo =
+    String(msg).toLowerCase().includes("resent") || String(msg).toLowerCase().includes("already");
 
   return (
     <LinearGradient colors={["#0B3A8D", "#0B1220"]} style={styles.bg}>
@@ -153,19 +243,25 @@ export default function VerifyEmailScreen({ navigation }) {
           <Ionicons name="mail-outline" size={44} color="#fff" />
         </View>
 
-        <Text style={styles.title}>Verify Your Email</Text>
+        <Text style={styles.title}>{title}</Text>
         <Text style={styles.subtitle}>
-          We’ve sent a verification link to your email. Please check your inbox and verify your account.
+          We’ve sent a verification link to your email. Please open it, then tap OK.
         </Text>
 
-        {!!msg && <Text style={[styles.msg, { color: msg.includes("already") ? "#2F5FE8" : "#D23B3B" }]}>{msg}</Text>}
+        {!!msg && (
+          <Text style={[styles.msg, { color: isInfo ? "#2F5FE8" : "#D23B3B" }]}>
+            {String(msg)}
+          </Text>
+        )}
 
         <Pressable style={styles.okBtn} onPress={onOk} disabled={loading}>
           <Text style={styles.okText}>{loading ? "Checking..." : "Ok"}</Text>
         </Pressable>
 
         <Pressable onPress={onResend} disabled={loading}>
-          <Text style={styles.resend}>Resend verification email</Text>
+          <Text style={styles.resend}>
+            {mode === "reactivation" ? "Resend reactivation email" : "Resend verification email"}
+          </Text>
         </Pressable>
       </View>
     </LinearGradient>
@@ -189,7 +285,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 14,
   },
-  title: { fontSize: 18, fontWeight: "800", color: "#0B1220" },
+  title: { fontSize: 18, fontWeight: "800", color: "#0B1220", textAlign: "center" },
   subtitle: {
     marginTop: 8,
     textAlign: "center",
